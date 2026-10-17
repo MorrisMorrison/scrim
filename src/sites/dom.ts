@@ -7,17 +7,30 @@ const LABELLED = 'img[alt], a[aria-label], img[aria-label], video[aria-label], s
 // Controls carry site chrome, not content (X puts a "Grok actions" button on every tweet).
 const CONTROL = 'button, [role="button"], [role^="menu"]';
 
+const NON_TEXT = new Set(['SCRIPT', 'STYLE']);
+
 // Text used for keyword matching. Includes alt-text and link/media aria-labels so image-only
 // promoted posts (headline baked into the picture) are still caught.
+// Walks text nodes instead of reading innerText: the pre-hide CSS sets visibility:hidden, under
+// which Blink's innerText is "", and innerText forces a layout on every call.
 export function richText(el: Element): string {
-  const base = (el as HTMLElement).innerText || el.textContent || '';
-  const extras: string[] = [];
+  const parts: string[] = [];
+  const doc = el.ownerDocument;
+  const walker = doc.createTreeWalker(el, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, {
+    acceptNode: (n) =>
+      n.nodeType === Node.ELEMENT_NODE && NON_TEXT.has((n as Element).tagName)
+        ? NodeFilter.FILTER_REJECT // skips the whole subtree
+        : NodeFilter.FILTER_ACCEPT,
+  });
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    if (n.nodeType === Node.TEXT_NODE && n.nodeValue) parts.push(n.nodeValue);
+  }
   el.querySelectorAll(LABELLED).forEach((n) => {
     if (insideControl(n, el)) return;
     const label = n.getAttribute('alt') || n.getAttribute('aria-label');
-    if (label) extras.push(label);
+    if (label) parts.push(label);
   });
-  return [base, ...extras].join(' ').trim();
+  return parts.join(' ').replace(/\s+/g, ' ').trim();
 }
 
 // Whether n is a control, or inside one, within the item (the item itself doesn't count).

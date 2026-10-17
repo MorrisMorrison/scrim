@@ -8,6 +8,20 @@ function item(html: string): Element {
 }
 
 describe('richText', () => {
+  it('reads text without innerText (empty for pre-hidden items in Blink)', () => {
+    const el = item('<p>an LLM post</p>');
+    // Blink returns "" from innerText under visibility:hidden, which the pre-hide CSS sets.
+    Object.defineProperty(el, 'innerText', { get: () => '' });
+    expect(richText(el)).toBe('an LLM post');
+  });
+
+  it('separates elements with single spaces and skips script/style', () => {
+    const el = item(
+      '<div>Title</div><div>by   author\n\n </div><script>var LLM = 1;</script><style>.ai{}</style><span>3h</span>',
+    );
+    expect(richText(el)).toBe('Title by author 3h');
+  });
+
   it('includes image alt text', () => {
     expect(richText(item('<p>hello</p><img src="x.png" alt="Banner about LLM agents">'))).toContain(
       'Banner about LLM agents',
