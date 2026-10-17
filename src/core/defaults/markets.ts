@@ -1,0 +1,61 @@
+import type { SourceRef } from '../model';
+import { subreddits } from './sources';
+
+// Crypto and trading chatter. "stocks", "shares", "coin" and "moon" alone are left out on purpose
+// (soup stock, coin collections, the actual moon).
+export const MARKETS_KEYWORDS: string[] = [
+  'crypto',
+  'cryptocurrency',
+  'Bitcoin',
+  'BTC',
+  'Ethereum',
+  'ETH',
+  'Solana',
+  'Dogecoin',
+  'altcoin',
+  'memecoin',
+  'shitcoin',
+  'stablecoin',
+  'NFT',
+  'blockchain',
+  'DeFi',
+  'Web3',
+  'HODL',
+  'to the moon',
+  'bull market',
+  'bear market',
+  'stock market',
+  'stock pick',
+  'day trading',
+  'options trading',
+  'meme stock',
+  'short squeeze',
+  'earnings call',
+  'S&P 500',
+  'Nasdaq',
+  'Dow Jones',
+  'DAX',
+  'ETF',
+  // German
+  'Krypto',
+  'Kryptowährung',
+  'Börse',
+  'Aktie',
+  'Aktien',
+  'Depot',
+];
+
+export const MARKETS_SOURCES: SourceRef[] = subreddits(
+  'CryptoCurrency',
+  'CryptoMarkets',
+  'Bitcoin',
+  'ethereum',
+  'SatoshiStreetBets',
+  'wallstreetbets',
+  'stocks',
+  'investing',
+  'StockMarket',
+  'Daytrading',
+  'Finanzen',
+  'mauerstrassenwetten',
+);

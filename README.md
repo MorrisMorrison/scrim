@@ -68,10 +68,13 @@ storage as long as you load it from the same folder.
 | Software/IT | programming terms, languages and tools, dev subreddits; blocks Hacker News |
 | Work | job, career and office terms in English and German, work subreddits (e.g. r/LinkedInLunatics, r/antiwork) |
 | Politics | political terms, parties and politicians (EN/DE), political subreddits |
+| Crypto & markets | crypto, coins, trading and stock-market chatter (EN/DE), r/wallstreetbets, r/CryptoCurrency and similar |
+| Hustle & self-improvement | side hustles, passive income, grindset and guru phrases, r/sidehustle, r/Entrepreneur and similar |
+| Ragebait & clickbait | clickbait phrases and SHOUTING headlines ("DESTROYS", "SHOCKING"), freakout subreddits |
 | NSFW | a small set of explicit terms |
 
 The **Default** profile hides AI. **Downtime** hides AI, Work and Software/IT and tames YouTube.
-Politics and NSFW ship turned off; switch them on in a profile.
+The other topics ship turned off; switch them on in a profile.
 
 ### Personal settings
 

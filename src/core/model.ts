@@ -20,7 +20,7 @@ export interface Topic extends TopicLists {
   name: string;
 }
 
-export type BuiltinTopicId = 'ai' | 'software' | 'work' | 'politics' | 'nsfw';
+export type BuiltinTopicId = 'ai' | 'software' | 'work' | 'politics' | 'markets' | 'hustle' | 'ragebait' | 'nsfw';
 
 export type Action = 'hide' | 'blur' | 'collapse';
 

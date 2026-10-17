@@ -9,7 +9,7 @@ const hits = (id: keyof typeof BUILTIN_TOPICS, text: string) =>
 
 describe('shipped topics', () => {
   it('are consistent and free of duplicate entries', () => {
-    expect(BUILTIN_TOPIC_IDS).toEqual(['ai', 'software', 'work', 'politics', 'nsfw']);
+    expect(BUILTIN_TOPIC_IDS).toEqual(['ai', 'software', 'work', 'politics', 'markets', 'hustle', 'ragebait', 'nsfw']);
     for (const id of BUILTIN_TOPIC_IDS) {
       const t = BUILTIN_TOPICS[id];
       expect(t.id).toBe(id);
@@ -36,6 +36,9 @@ describe('default sources', () => {
     expect(topicOf('programming')).toBe('software');
     expect(topicOf('LinkedInLunatics')).toBe('work');
     expect(topicOf('politics')).toBe('politics');
+    expect(topicOf('wallstreetbets')).toBe('markets');
+    expect(topicOf('sidehustle')).toBe('hustle');
+    expect(topicOf('PublicFreakout')).toBe('ragebait');
     expect(topicOf('gardening')).toBeNull();
   });
 });
@@ -97,4 +100,45 @@ describe('politics keywords', () => {
       expect(hits('politics', s), s).toBe(false);
     }
   });
+});
+
+const topicCases: [keyof typeof BUILTIN_TOPICS, string[], string[]][] = [
+  [
+    'markets',
+    [
+      'Bitcoin breaks 100k',
+      'this memecoin is going to the moon',
+      'BTC and ETH dump overnight',
+      'Nasdaq closes at record high',
+      'Lohnt sich ein ETF-Sparplan?',
+      'Die Börse bricht ein',
+    ],
+    ['chicken stock for the soup', 'the moon is bright tonight', 'my favourite coin collection'],
+  ],
+  [
+    'hustle',
+    [
+      'My side hustle makes $5k a month',
+      'Passive income ideas for 2026',
+      'Sigma male grindset morning routine',
+      'Passives Einkommen mit Dividenden',
+    ],
+    ['my morning coffee', 'she is a great football coach', 'a quiet evening routine walk'],
+  ],
+  [
+    'ragebait',
+    [
+      "You won't believe what happened next",
+      'SHOCKING footage from the city council',
+      'Comedian DESTROYS heckler',
+      'unpopular opinion: pineapple belongs on pizza',
+      'Politiker rastet im Interview aus',
+    ],
+    ['a shocking amount of rain today', 'the door slams shut', 'the storm destroyed the old barn'],
+  ],
+];
+
+describe.each(topicCases)('%s keywords', (id, matches, misses) => {
+  it.each(matches)('match: %s', (s) => expect(hits(id, s)).toBe(true));
+  it.each(misses)('miss: %s', (s) => expect(hits(id, s)).toBe(false));
 });
