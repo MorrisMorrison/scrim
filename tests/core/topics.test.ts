@@ -22,7 +22,7 @@ describe('defaults', () => {
   it('know their built-in ids', () => {
     expect(isBuiltinTopicId('ai')).toBe(true);
     expect(isBuiltinTopicId('nope')).toBe(false);
-    expect(BUILTIN_TOPICS.work.keywords).toEqual([]);
+    expect(BUILTIN_TOPICS.work.keywords).toContain('LinkedIn');
     expect(BUILTIN_TOPICS.software.blockSites).toContain('news.ycombinator.com');
   });
 });

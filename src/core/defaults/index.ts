@@ -1,22 +1,31 @@
 import type { BuiltinTopicId, GlobalSettings, Profile, Topic } from '../model';
-import { AI_KEYWORDS } from './ai';
+import { AI_KEYWORDS, AI_SOURCES } from './ai';
 import { NSFW_KEYWORDS } from './nsfw';
-import { SOFTWARE_KEYWORDS } from './software';
+import { POLITICS_KEYWORDS, POLITICS_SOURCES } from './politics';
+import { SOFTWARE_KEYWORDS, SOFTWARE_SOURCES } from './software';
+import { WORK_KEYWORDS, WORK_SOURCES } from './work';
 
-export const BUILTIN_TOPIC_IDS: readonly BuiltinTopicId[] = ['ai', 'software', 'work', 'nsfw'];
+export const BUILTIN_TOPIC_IDS: readonly BuiltinTopicId[] = ['ai', 'software', 'work', 'politics', 'nsfw'];
 
 export const BUILTIN_TOPICS: Readonly<Record<BuiltinTopicId, Topic>> = {
-  ai: { id: 'ai', name: 'AI', keywords: AI_KEYWORDS, sources: [], blockSites: [] },
+  ai: { id: 'ai', name: 'AI', keywords: AI_KEYWORDS, sources: AI_SOURCES, blockSites: [] },
   software: {
     id: 'software',
     name: 'Software/IT',
     keywords: SOFTWARE_KEYWORDS,
-    sources: [],
+    sources: SOFTWARE_SOURCES,
     blockSites: ['news.ycombinator.com'],
   },
-  // Ships empty on purpose: the repo is public, so work orgs/domains only ever live
-  // in the user's browser storage or exported JSON.
-  work: { id: 'work', name: 'Work', keywords: [], sources: [], blockSites: [] },
+  // Generic job/career terms only. Personal work orgs and domains never ship here: they
+  // live in the user's browser storage or exported (private) config.
+  work: { id: 'work', name: 'Work', keywords: WORK_KEYWORDS, sources: WORK_SOURCES, blockSites: [] },
+  politics: {
+    id: 'politics',
+    name: 'Politics',
+    keywords: POLITICS_KEYWORDS,
+    sources: POLITICS_SOURCES,
+    blockSites: [],
+  },
   nsfw: { id: 'nsfw', name: 'NSFW', keywords: NSFW_KEYWORDS, sources: [], blockSites: [] },
 };
 

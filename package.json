@@ -12,7 +12,8 @@
     "typecheck": "wxt prepare && tsc --noEmit && svelte-check --tsconfig ./tsconfig.json",
     "lint": "eslint .",
     "test": "vitest run --passWithNoTests",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "update": "git pull --ff-only && pnpm install --frozen-lockfile && wxt build"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

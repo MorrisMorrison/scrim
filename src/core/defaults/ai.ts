@@ -1,3 +1,6 @@
+import type { SourceRef } from '../model';
+import { subreddits } from './sources';
+
 // Conservative by design. Pure-uppercase entries (AI, AGI, LLM, KI) match
 // case-sensitively so "email", "again", "chair" never trigger. See matcher.ts.
 export const AI_KEYWORDS: string[] = [
@@ -49,3 +52,21 @@ export const AI_KEYWORDS: string[] = [
   'DeepSeek',
   'Qwen',
 ];
+
+// AI-focused communities: hidden by source even when the post itself is just an image.
+export const AI_SOURCES: SourceRef[] = subreddits(
+  'accelerate',
+  'singularity',
+  'artificial',
+  'OpenAI',
+  'ChatGPT',
+  'ChatGPTPro',
+  'ClaudeAI',
+  'LocalLLaMA',
+  'MachineLearning',
+  'StableDiffusion',
+  'midjourney',
+  'aiArt',
+  'GeminiAI',
+  'DeepSeek',
+);

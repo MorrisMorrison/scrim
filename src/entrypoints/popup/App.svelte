@@ -133,6 +133,11 @@
 
     <footer>
       <button class="link" onclick={() => browser.runtime.openOptionsPage()}>Options</button>
+      <button
+        class="link"
+        title="Reload Scrim from disk after `pnpm run update` (unpacked install)"
+        onclick={() => browser.runtime.reload()}>Reload Scrim</button
+      >
     </footer>
   {/if}
 </main>
@@ -146,5 +151,5 @@
   .counts { margin: 0; padding-left: 18px; }
   .log { margin: 0; padding-left: 18px; max-height: 220px; overflow: auto; }
   .log li { display: flex; flex-direction: column; margin-bottom: 4px; }
-  footer { border-top: 1px solid var(--border); padding-top: 8px; }
+  footer { border-top: 1px solid var(--border); padding-top: 8px; display: flex; justify-content: space-between; }
 </style>

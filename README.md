@@ -4,7 +4,7 @@ A Chromium extension (Chrome, Edge, Brave) that hides whole **topics** across fe
 blocks sites per profile, and tames YouTube. It's the successor to
 [no-ai-filter](https://github.com/MorrisMorrison/no-ai-filter).
 
-- **Topics:** AI, Software/IT, Work, NSFW, or your own. Each has keywords (plain or `/regex/flags`),
+- **Topics:** AI, Software/IT, Work, Politics, NSFW, or your own. Each has keywords (plain or `/regex/flags`),
   typed sources (`r/sub`, `yt:@channel`, `x:@user`, `gh:owner`, domains) and sites to block outright.
 - **Profiles:** named bundles of topics, an action (hide, blur, collapse) and site tweaks. Switch from the popup.
   Ships with **Default** (AI) and **Downtime** (AI + Work + Software/IT + YouTube tweaks).
@@ -24,6 +24,15 @@ pnpm build
 ```
 
 Open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked**, and pick `.output/chrome-mv3`.
+
+### Update
+
+```bash
+pnpm run update   # git pull + install + build into the same .output/chrome-mv3
+```
+
+Then click **Reload Scrim** in the popup (or the reload icon in `chrome://extensions`).
+Settings are kept: an unpacked extension keeps its ID and storage as long as it's loaded from the same folder.
 
 ## Develop
 

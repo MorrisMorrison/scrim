@@ -1,3 +1,6 @@
+import type { SourceRef } from '../model';
+import { subreddits } from './sources';
+
 // High-signal, low-ambiguity software/IT terms. Everyday-word collisions
 // (React, Swift, Go, Rust, code, bug, server, query, terminal) are left out on purpose.
 export const SOFTWARE_KEYWORDS: string[] = [
@@ -57,6 +60,8 @@ export const SOFTWARE_KEYWORDS: string[] = [
   'VS Code',
   'Visual Studio',
   'LeetCode',
+  'Linux',
+  'Torvalds',
   // German
   'Programmierung',
   'programmieren',
@@ -83,6 +88,8 @@ export const SOFTWARE_KEYWORDS: string[] = [
   'React.js',
   'Ruby on Rails',
   'Spring Boot',
+  'Rust programming',
+  'Rustlang',
   // acronyms (case-sensitive)
   'API',
   'SDK',
@@ -96,3 +103,21 @@ export const SOFTWARE_KEYWORDS: string[] = [
   'TDD',
   'ORM',
 ];
+
+export const SOFTWARE_SOURCES: SourceRef[] = subreddits(
+  'programming',
+  'ProgrammerHumor',
+  'webdev',
+  'javascript',
+  'typescript',
+  'Python',
+  'golang',
+  'rust',
+  'java',
+  'linux',
+  'devops',
+  'sysadmin',
+  'ExperiencedDevs',
+  'cscareerquestions',
+  'learnprogramming',
+);

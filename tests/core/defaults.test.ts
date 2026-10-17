@@ -1,0 +1,100 @@
+import { describe, expect, it } from 'vitest';
+import { BUILTIN_TOPIC_IDS, BUILTIN_TOPICS, DEFAULT_PROFILES } from '../../src/core/defaults';
+import { compileKeywords, firstMatch } from '../../src/core/matcher';
+import { buildPipeline } from '../../src/core/pipeline';
+import { sourceKey } from '../../src/core/sources';
+
+const hits = (id: keyof typeof BUILTIN_TOPICS, text: string) =>
+  firstMatch(text, compileKeywords(BUILTIN_TOPICS[id].keywords)) !== null;
+
+describe('shipped topics', () => {
+  it('are consistent and free of duplicate entries', () => {
+    expect(BUILTIN_TOPIC_IDS).toEqual(['ai', 'software', 'work', 'politics', 'nsfw']);
+    for (const id of BUILTIN_TOPIC_IDS) {
+      const t = BUILTIN_TOPICS[id];
+      expect(t.id).toBe(id);
+      expect(new Set(t.keywords).size, `${id} keywords`).toBe(t.keywords.length);
+      expect(new Set(t.sources.map(sourceKey)).size, `${id} sources`).toBe(t.sources.length);
+    }
+  });
+
+  it('default profiles only reference shipped topics', () => {
+    for (const p of DEFAULT_PROFILES) {
+      for (const t of p.topics) expect(BUILTIN_TOPIC_IDS).toContain(t);
+    }
+  });
+});
+
+describe('default sources', () => {
+  const pipeline = buildPipeline(BUILTIN_TOPIC_IDS.map((id) => BUILTIN_TOPICS[id]));
+  const topicOf = (name: string) =>
+    pipeline.evaluate({ text: '', sources: [{ kind: 'subreddit', name }] })?.topicId ?? null;
+
+  it('route well-known subreddits to their topic', () => {
+    expect(topicOf('accelerate')).toBe('ai');
+    expect(topicOf('singularity')).toBe('ai');
+    expect(topicOf('programming')).toBe('software');
+    expect(topicOf('LinkedInLunatics')).toBe('work');
+    expect(topicOf('politics')).toBe('politics');
+    expect(topicOf('gardening')).toBeNull();
+  });
+});
+
+describe('software keywords additions', () => {
+  it('catch Linux and Rust-the-language', () => {
+    expect(hits('software', 'Linux Torvalds')).toBe(true);
+    expect(hits('software', 'Learning Rust programming in 2026')).toBe(true);
+    expect(hits('software', 'why rustlang won')).toBe(true);
+    expect(hits('software', 'rust spots on the old car')).toBe(false);
+  });
+});
+
+describe('work keywords', () => {
+  it('catch work content', () => {
+    for (const s of [
+      'Posted on LinkedIn about my promotion',
+      'Big tech layoffs continue',
+      'How I prepared for my job interview',
+      'Return to office mandates are back',
+      'Tipps für die Gehaltsverhandlung',
+      'Meine Bewerbung wurde abgelehnt',
+    ]) {
+      expect(hits('work', s), s).toBe(true);
+    }
+  });
+
+  it('leave everyday text alone', () => {
+    for (const s of [
+      'the band played a great office party set',
+      'resume playback where you left off',
+      'my cat works hard at napping',
+    ]) {
+      expect(hits('work', s), s).toBe(false);
+    }
+  });
+});
+
+describe('politics keywords', () => {
+  it('catch political content in English and German', () => {
+    for (const s of [
+      'Senate passes the new bill',
+      'Trump announces tariffs',
+      'Election results are in',
+      'Merz und die Koalition streiten',
+      'Die AfD legt in Umfragen zu',
+      'Debatte im Bundestag',
+    ]) {
+      expect(hits('politics', s), s).toBe(true);
+    }
+  });
+
+  it('leave everyday text alone', () => {
+    for (const s of [
+      'my favourite card game has a trump suit',
+      'the party starts at eight',
+      'wir haben die Wahl zwischen Pizza und Pasta',
+    ]) {
+      expect(hits('politics', s), s).toBe(false);
+    }
+  });
+});
