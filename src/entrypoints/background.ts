@@ -21,7 +21,9 @@ export default defineBackground(() => {
   onStoreChanged(() => void sync());
 
   browser.alarms.onAlarm.addListener((alarm) => {
-    if (alarm.name.startsWith('peek:')) void endSitePeek(alarm.name);
+    if (alarm.name.startsWith('peek:')) {
+      endSitePeek(alarm.name).catch((e) => console.error('[scrim] ending peek failed', e));
+    }
   });
 
   browser.tabs.onUpdated.addListener((tabId, info) => {

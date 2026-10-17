@@ -11,11 +11,15 @@ type Rule = Browser.declarativeNetRequest.Rule;
 const LAST_DOMAINS_KEY = 'blockedDomains';
 let queue: Promise<void> = Promise.resolve();
 
-// Runs one at a time: overlapping updateDynamicRules calls would collide on rule ids.
-export function syncBlockRules(): Promise<void> {
-  const run = queue.catch(() => undefined).then(doSync);
+// Rule changes run one at a time: overlapping updates would collide on rule ids.
+function serial(task: () => Promise<void>): Promise<void> {
+  const run = queue.catch(() => undefined).then(task);
   queue = run;
   return run;
+}
+
+export function syncBlockRules(): Promise<void> {
+  return serial(doSync);
 }
 
 async function doSync(): Promise<void> {
@@ -36,6 +40,10 @@ async function doSync(): Promise<void> {
   if (!fresh.length) return;
 
   // Tabs already sitting on a newly blocked site get reloaded onto the block page.
+  await reloadTabsOn(fresh);
+}
+
+async function reloadTabsOn(domains: string[]): Promise<void> {
   for (const tab of await browser.tabs.query({})) {
     if (tab.id === undefined || !tab.url) continue;
     let host: string;
@@ -44,22 +52,35 @@ async function doSync(): Promise<void> {
     } catch {
       continue;
     }
-    if (fresh.some((d) => hostMatches(host, d))) void browser.tabs.reload(tab.id);
+    if (domains.some((d) => hostMatches(host, d))) browser.tabs.reload(tab.id).catch(() => {});
   }
 }
 
-export async function startSitePeek(domain: string): Promise<void> {
-  const existing = await browser.declarativeNetRequest.getSessionRules();
-  const prior = existing.find((r) => r.condition.requestDomains?.includes(domain));
-  const id = prior?.id ?? Math.max(0, ...existing.map((r) => r.id)) + 1;
-  await browser.declarativeNetRequest.updateSessionRules({
-    removeRuleIds: prior ? [prior.id] : [],
-    addRules: [peekRule(id, domain) as unknown as Rule],
+const PEEK_ALARM = 'peek:';
+
+export function startSitePeek(domain: string): Promise<void> {
+  return serial(async () => {
+    const existing = await browser.declarativeNetRequest.getSessionRules();
+    const prior = existing.find((r) => r.condition.requestDomains?.includes(domain));
+    const id = prior?.id ?? Math.max(0, ...existing.map((r) => r.id)) + 1;
+    await browser.declarativeNetRequest.updateSessionRules({
+      removeRuleIds: prior ? [prior.id] : [],
+      addRules: [peekRule(id, domain) as unknown as Rule],
+    });
+    await browser.alarms.create(PEEK_ALARM + domain, { delayInMinutes: PEEK_MINUTES });
   });
-  await browser.alarms.create(`peek:${id}`, { delayInMinutes: PEEK_MINUTES });
 }
 
-export async function endSitePeek(alarmName: string): Promise<void> {
-  const id = Number(alarmName.slice('peek:'.length));
-  if (Number.isInteger(id)) await browser.declarativeNetRequest.updateSessionRules({ removeRuleIds: [id] });
+// Alarm "peek:<domain>" fired: drop the allow rule, and send open tabs of a still-blocked
+// domain back to the block page.
+export function endSitePeek(alarmName: string): Promise<void> {
+  const domain = alarmName.slice(PEEK_ALARM.length);
+  return serial(async () => {
+    const existing = await browser.declarativeNetRequest.getSessionRules();
+    const ids = existing.filter((r) => r.condition.requestDomains?.includes(domain)).map((r) => r.id);
+    if (!ids.length) return;
+    await browser.declarativeNetRequest.updateSessionRules({ removeRuleIds: ids });
+    const blocked = await browser.declarativeNetRequest.getDynamicRules();
+    if (blocked.some((r) => r.condition.requestDomains?.includes(domain))) await reloadTabsOn([domain]);
+  });
 }

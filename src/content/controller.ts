@@ -14,7 +14,7 @@ import {
 } from '../core/store';
 import { localKV, onStoreChanged } from '../platform/kv';
 import type { LogResponse, Message } from '../platform/messages';
-import { isPeeking, startPeek } from '../platform/peek';
+import { peekEnd, startPeek } from '../platform/peek';
 import { tweaksForSite } from '../sites';
 import type { SiteAdapter } from '../sites/types';
 import { Engine } from './engine';
@@ -50,17 +50,26 @@ export async function runContent(
   };
 
   const beginCheck = latestRun();
+  let peekTimer: ReturnType<typeof setTimeout> | undefined;
+
+  // Peeks expire: look at the page again then, so the block comes back.
+  const recheckAt = (until: number) => {
+    clearTimeout(peekTimer);
+    peekTimer = setTimeout(() => void checkPage().catch(failOpen), Math.max(0, until - Date.now()) + 50);
+  };
 
   // url defaults to the committed location; SPA navigations pass the destination instead.
   async function checkPage(url: URL = new URL(location.href)): Promise<void> {
     const isCurrent = beginCheck();
     const ref = adapter.pageSource?.(url) ?? null;
     const verdict = ref ? pipeline.evaluate({ text: '', sources: [ref] }) : null;
-    const peeking = ref && verdict ? await isPeeking(sourceKey(ref)) : false;
+    const peekUntil = ref && verdict ? await peekEnd(sourceKey(ref)) : null;
     // A newer navigation started while we awaited: it owns the overlay now.
     if (!isCurrent()) return;
-    if (!ref || !verdict || peeking) {
+    clearTimeout(peekTimer);
+    if (!ref || !verdict || peekUntil !== null) {
       hidePageBlock(doc);
+      if (peekUntil !== null) recheckAt(peekUntil);
       return;
     }
     const topicName = findTopic(state, verdict.topicId)?.name ?? verdict.topicId;
@@ -69,7 +78,13 @@ export async function runContent(
       message: blockMessage({ site: formatSource(ref), topic: topicName, profile: profileName }),
       detail: `${topicName} · ${profileName}`,
       onPeek: () => {
-        void startPeek(sourceKey(ref)).then(() => hidePageBlock(doc));
+        startPeek(sourceKey(ref))
+          .then((until) => {
+            if (!isCurrent()) return; // the user has moved on to another page
+            hidePageBlock(doc);
+            recheckAt(until);
+          })
+          .catch(failOpen);
       },
     });
   }
