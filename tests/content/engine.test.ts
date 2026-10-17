@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Engine, type EngineOptions } from '../../src/content/engine';
+import { Engine, SAFETY_SCAN_MS, type EngineOptions } from '../../src/content/engine';
 import type { Action, Topic } from '../../src/core/model';
 import { buildPipeline } from '../../src/core/pipeline';
 import type { SiteAdapter } from '../../src/sites/types';
@@ -427,6 +427,133 @@ describe('Engine', () => {
       const ids = extract.mock.calls.map(([el]) => el.id);
       expect(ids).toContain('a');
       expect(ids).not.toContain('b');
+    });
+  });
+
+  describe('incremental scanning (performance)', () => {
+    // Full-document lookups for unsettled items: the expensive query we avoid on busy pages.
+    const fullQueries = (spy: { mock: { calls: unknown[][] } }) =>
+      spy.mock.calls.filter(([sel]) => String(sel).includes(':not([data-scrim])')).length;
+
+    it('a churn frame without new items runs no full-document query', async () => {
+      const e = setup('<div class="item" id="a">cats</div><div id="chat"></div>');
+      e.configure(config());
+      e.start();
+      const qsa = vi.spyOn(document, 'querySelectorAll');
+      try {
+        $('chat').appendChild(document.createElement('p')).textContent = 'new chat line';
+        await nextFrame();
+        expect(fullQueries(qsa)).toBe(0);
+      } finally {
+        qsa.mockRestore();
+      }
+    });
+
+    it('finds items added deep inside new containers', async () => {
+      const e = setup('<div id="feed"></div>');
+      e.configure(config());
+      e.start();
+      $('feed').insertAdjacentHTML(
+        'beforeend',
+        '<div><section><div class="item" id="n">an LLM post</div><div class="item" id="m">cats</div></section></div>',
+      );
+      await nextFrame();
+      expect(state('n')).toBe('hit:ai');
+      expect(state('m')).toBe('pass');
+    });
+
+    it('removal-only mutations schedule no work', async () => {
+      const e = setup('<div class="item" id="a">cats</div><p id="gone">x</p>');
+      e.configure(config());
+      e.start();
+      const raf = vi.spyOn(globalThis, 'requestAnimationFrame');
+      try {
+        $('gone').remove();
+        await Promise.resolve();
+        await new Promise((r) => setTimeout(r, 0));
+        expect(raf).not.toHaveBeenCalled();
+      } finally {
+        raf.mockRestore();
+      }
+    });
+
+    it("the engine's own collapse bars never trigger a re-check", async () => {
+      const extract = vi.fn(adapter.extract);
+      const e = setup('<div id="feed"></div>', { adapter: { ...adapter, extract } });
+      e.configure(config('collapse'));
+      e.start();
+      $('feed').insertAdjacentHTML('beforeend', '<div class="item" id="n">an LLM post</div>');
+      await nextFrame();
+      expect(state('n')).toBe('hit:ai');
+      expect(document.querySelector('[data-scrim-bar]')).not.toBeNull();
+      await nextFrame();
+      await nextFrame();
+      expect(extract).toHaveBeenCalledTimes(1);
+    });
+
+    it('re-checks pending shells on the timer without a full-document query', async () => {
+      vi.useFakeTimers();
+      const e = setup('<div class="item" id="a"></div>');
+      e.configure(config());
+      e.start();
+      const qsa = vi.spyOn(document, 'querySelectorAll');
+      try {
+        vi.advanceTimersByTime(800);
+        expect(state('a')).toBe('pass');
+        expect(fullQueries(qsa)).toBe(0);
+      } finally {
+        qsa.mockRestore();
+      }
+    });
+
+    it('a periodic safety scan finds items that became matchable without being added', async () => {
+      vi.useFakeTimers();
+      const e = setup('<div id="x">an LLM post</div><div id="chat"></div>');
+      e.configure(config());
+      e.start();
+      $('x').classList.add('item'); // class changes aren't observed…
+      $('chat').appendChild(document.createElement('p')); // …but the page is still changing
+      await Promise.resolve();
+      vi.advanceTimersByTime(SAFETY_SCAN_MS);
+      expect(state('x')).toBe('hit:ai');
+    });
+  });
+
+  describe('idle when there is nothing to filter', () => {
+    it('schedules no frames for mutations while the pipeline is empty', async () => {
+      const e = setup('<div id="feed"></div>');
+      e.configure({ ...config(), pipeline: buildPipeline([]) });
+      e.start();
+      const raf = vi.spyOn(globalThis, 'requestAnimationFrame');
+      try {
+        $('feed').insertAdjacentHTML('beforeend', '<div class="item">an LLM post</div>');
+        await Promise.resolve();
+        await new Promise((r) => setTimeout(r, 0));
+        expect(raf).not.toHaveBeenCalled();
+      } finally {
+        raf.mockRestore();
+      }
+    });
+
+    it('starts observing when topics become active, and stops again when they go away', async () => {
+      const e = setup('<div id="feed"></div>');
+      e.configure({ ...config(), pipeline: buildPipeline([]) });
+      e.start();
+      e.configure(config());
+      $('feed').insertAdjacentHTML('beforeend', '<div class="item" id="n">an LLM post</div>');
+      await nextFrame();
+      expect(state('n')).toBe('hit:ai');
+
+      e.configure({ ...config(), pipeline: buildPipeline([]) });
+      const raf = vi.spyOn(globalThis, 'requestAnimationFrame');
+      try {
+        $('feed').insertAdjacentHTML('beforeend', '<div class="item">more</div>');
+        await Promise.resolve();
+        await new Promise((r) => setTimeout(r, 0));
+        expect(raf).not.toHaveBeenCalled();
+      } finally {
+        raf.mockRestore();
+      }
     });
   });
 });
