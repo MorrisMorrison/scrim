@@ -252,4 +252,69 @@ describe('Engine', () => {
     document.body.insertAdjacentHTML('beforeend', '<div class="item" id="n">late LLM post</div>');
     await vi.waitFor(() => expect(state('n')).toBe('hit:ai'));
   });
+
+  // YouTube and Reddit reuse item elements for new content.
+  describe('reused item elements', () => {
+    it('a passed item whose content changes is re-evaluated (becomes hit) on scan()', () => {
+      const e = setup('<div class="item" id="a"><a href="/v/1">cats</a></div>');
+      e.configure(config());
+      expect(state('a')).toBe('pass');
+      $('a').innerHTML = '<a href="/v/2">an LLM explainer</a>';
+      e.scan();
+      expect(state('a')).toBe('hit:ai');
+      expect($('a').classList.contains('scrim-hidden')).toBe(true);
+      expect(e.total()).toBe(1);
+    });
+
+    it('a hit item whose content changes to harmless content is shown again on scan()', () => {
+      const withRelated: SiteAdapter = { ...adapter, related: (el) => [el.nextElementSibling as Element] };
+      const e = setup('<div class="item" id="a"><a href="/v/1">LLM news</a></div><div id="r">meta</div>', {
+        adapter: withRelated,
+      });
+      e.configure(config('collapse'));
+      expect(state('a')).toBe('hit:ai');
+      expect(document.querySelector('[data-scrim-bar]')).not.toBeNull();
+      $('a').innerHTML = '<a href="/v/2">cats</a>';
+      e.scan();
+      expect(state('a')).toBe('pass');
+      expect($('a').classList.contains('scrim-hidden')).toBe(false);
+      expect(document.querySelector('[data-scrim-bar]')).toBeNull();
+      expect(state('r')).toBeNull();
+      expect($('r').classList.contains('scrim-hidden')).toBe(false);
+    });
+
+    it('an unchanged item keeps its state and is not counted again', () => {
+      const e = setup('<div class="item" id="a">LLM</div><div class="item" id="b">cats</div>');
+      e.configure(config());
+      e.scan();
+      expect(state('a')).toBe('hit:ai');
+      expect(state('b')).toBe('pass');
+      expect(e.total()).toBe(1);
+    });
+
+    it('after start(), an in-place text change re-evaluates the item', async () => {
+      const e = setup('<div class="item" id="a">cats</div>');
+      e.configure(config());
+      e.start();
+      expect(state('a')).toBe('pass');
+      ($('a').firstChild as Text).data = 'an LLM post';
+      await vi.waitFor(() => expect(state('a')).toBe('hit:ai'));
+    });
+
+    it('after start(), a frame only re-checks the items that mutated', async () => {
+      const extract = vi.fn(adapter.extract);
+      const e = setup('<div class="item" id="a">cats</div><div class="item" id="b">dogs</div>', {
+        adapter: { ...adapter, extract },
+      });
+      e.configure(config());
+      e.start();
+      extract.mockClear();
+      $('a').textContent = 'birds';
+      await vi.waitFor(() => expect(extract).toHaveBeenCalled());
+      await new Promise((r) => requestAnimationFrame(() => r(undefined)));
+      const ids = extract.mock.calls.map(([el]) => el.id);
+      expect(ids).toContain('a');
+      expect(ids).not.toContain('b');
+    });
+  });
 });

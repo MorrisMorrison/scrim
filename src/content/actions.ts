@@ -6,13 +6,14 @@ const ACTION_CLASSES = ['scrim-hidden', 'scrim-blurred'];
 
 const revealMode = (doc: Document) => doc.documentElement.classList.contains('scrim-reveal');
 
+// Returns the collapse bar it inserted, if any.
 export function applyAction(
   el: Element,
   related: Element[],
   action: Action,
   verdict: Verdict,
   topicName: string,
-): void {
+): Element | null {
   const all = [el, ...related];
   for (const e of all) e.setAttribute(SCRIM_ATTR, `hit:${verdict.topicId}`);
 
@@ -28,15 +29,15 @@ export function applyAction(
       },
       { capture: true },
     );
-    return;
+    return null;
   }
 
   for (const e of all) e.classList.add('scrim-hidden');
-  if (action === 'collapse') insertBar(el, all, topicName);
+  return action === 'collapse' ? insertBar(el, all, topicName) : null;
 }
 
 // Slim "Scrim · AI · show" bar before the item. Table rows (Hacker News) need a <tr>.
-function insertBar(el: Element, all: Element[], topicName: string): void {
+function insertBar(el: Element, all: Element[], topicName: string): Element {
   const doc = el.ownerDocument;
   const isRow = el.tagName === 'TR';
   const bar = doc.createElement(isRow ? 'tr' : 'div');
@@ -62,6 +63,7 @@ function insertBar(el: Element, all: Element[], topicName: string): void {
   });
   body.append(label, show);
   el.before(bar);
+  return bar;
 }
 
 // Last-resort recovery when applying an action threw midway: show the item as normal.
@@ -71,6 +73,15 @@ export function failOpen(el: Element): void {
     el.setAttribute(SCRIM_ATTR, 'pass');
   } catch {
     // Nothing more can be done for this element.
+  }
+}
+
+// Undoes applyAction (or a pass) for one item, so it can be evaluated afresh.
+export function clearItem(el: Element, related: Element[], bar: Element | null): void {
+  bar?.remove();
+  for (const e of [el, ...related]) {
+    e.removeAttribute(SCRIM_ATTR);
+    e.classList.remove(...ACTION_CLASSES);
   }
 }
 
