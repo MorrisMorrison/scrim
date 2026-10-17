@@ -58,17 +58,19 @@ export const hideAiOverview: Tweak = {
       }
     };
     let queued = false;
+    let disposed = false;
     const observer = new MutationObserver(() => {
       if (queued) return;
       queued = true;
       requestAnimationFrame(() => {
         queued = false;
-        hideAll();
+        if (!disposed) hideAll(); // a frame queued before cleanup must not hide anything
       });
     });
     hideAll();
     observer.observe(doc.documentElement, { childList: true, subtree: true });
     return () => {
+      disposed = true;
       observer.disconnect();
       doc.querySelectorAll(`[${AIO_MARK}]`).forEach((el) => {
         el.removeAttribute(AIO_MARK);

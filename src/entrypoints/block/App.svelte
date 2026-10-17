@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
   import { browser } from 'wxt/browser';
+  import { webUrl } from '../../core/host';
   import { blockMessage } from '../../core/messages';
   import { blockingTopic } from '../../core/rules';
   import { activeProfile, loadState, saveSettings } from '../../core/store';
@@ -9,13 +10,16 @@
   import ProfileSwitcher from '../../ui/ProfileSwitcher.svelte';
   import { createStateStore } from '../../ui/scrim-state.svelte';
 
-  // The redirect rule appends the original URL as the hash.
-  const target = location.hash.slice(1);
-  const host = (() => {
+  // The redirect rule appends the original URL as the hash. Anyone can link here with any
+  // hash, so only ever navigate to a web page.
+  const target = webUrl(location.hash.slice(1));
+  const host = target ? new URL(target).hostname : '';
+  // Framed by some other page: show the message but no controls (no clickjacking a peek).
+  const framed = (() => {
     try {
-      return new URL(target).hostname;
+      return window.top !== window;
     } catch {
-      return '';
+      return true;
     }
   })();
 
@@ -43,19 +47,27 @@
   async function peek() {
     if (!block) return;
     busy = true;
-    const msg: Message = { type: 'scrim:peek', domain: block.domain };
-    await browser.runtime.sendMessage(msg);
-    go();
+    try {
+      const msg: Message = { type: 'scrim:peek', domain: block.domain };
+      const reply = (await browser.runtime.sendMessage(msg)) as { ok?: boolean } | undefined;
+      // Without the allow rule the redirect would just bring us back here.
+      if (reply?.ok) go();
+    } finally {
+      busy = false;
+    }
   }
 
   async function switchProfile(id: string) {
     const s = store.state;
     if (!s) return;
     busy = true;
-    await saveSettings(localKV, { ...s.settings, activeProfileId: id });
-    const msg: Message = { type: 'scrim:sync' };
-    await browser.runtime.sendMessage(msg);
-    busy = false;
+    try {
+      await saveSettings(localKV, { ...s.settings, activeProfileId: id });
+      const msg: Message = { type: 'scrim:sync' };
+      await browser.runtime.sendMessage(msg);
+    } finally {
+      busy = false;
+    }
     if (!blockingTopic(await loadState(localKV), host)) go();
   }
 </script>
@@ -65,11 +77,13 @@
     <div class="emoji">🚫</div>
     <h1>{message}</h1>
     <p class="sub">{block.topic.name} · {profile.name}</p>
-    <button onclick={peek} disabled={busy}>Peek for 5 min</button>
-    <section>
-      <h2>Switch profile</h2>
-      <ProfileSwitcher profiles={store.state.profiles} activeId={profile.id} onselect={switchProfile} disabled={busy} />
-    </section>
+    {#if !framed}
+      <button onclick={peek} disabled={busy}>Peek for 5 min</button>
+      <section>
+        <h2>Switch profile</h2>
+        <ProfileSwitcher profiles={store.state.profiles} activeId={profile.id} onselect={switchProfile} disabled={busy} />
+      </section>
+    {/if}
   {/if}
 </main>
 

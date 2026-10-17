@@ -11,7 +11,13 @@ export interface RedirectRule {
   id: number;
   priority: 1;
   action: { type: 'redirect'; redirect: { regexSubstitution: string } };
-  condition: { regexFilter: string; requestDomains: string[]; resourceTypes: ['main_frame'] };
+  condition: {
+    regexFilter: string;
+    requestDomains: string[];
+    // Disabled subdomains of the blocked domain: a disabled host gets no blocking.
+    excludedRequestDomains?: string[];
+    resourceTypes: ['main_frame'];
+  };
 }
 
 export interface AllowRule {
@@ -37,12 +43,21 @@ export function blockedDomains(state: ScrimState): string[] {
 
 // "\0" is the whole matched URL; it lands in the block page's hash.
 export function buildBlockRules(state: ScrimState, blockPageUrl: string): RedirectRule[] {
-  return blockedDomains(state).map((domain, i) => ({
-    id: BLOCK_RULE_ID_BASE + i,
-    priority: 1,
-    action: { type: 'redirect', redirect: { regexSubstitution: `${blockPageUrl}#\\0` } },
-    condition: { regexFilter: '^.+$', requestDomains: [domain], resourceTypes: ['main_frame'] },
-  }));
+  const disabled = state.settings.disabledSites.map(normalizeHost).filter(Boolean);
+  return blockedDomains(state).map((domain, i) => {
+    const excluded = [...new Set(disabled.filter((d) => d !== domain && hostMatches(d, domain)))].sort();
+    return {
+      id: BLOCK_RULE_ID_BASE + i,
+      priority: 1,
+      action: { type: 'redirect', redirect: { regexSubstitution: `${blockPageUrl}#\\0` } },
+      condition: {
+        regexFilter: '^.+$',
+        requestDomains: [domain],
+        ...(excluded.length ? { excludedRequestDomains: excluded } : {}),
+        resourceTypes: ['main_frame'],
+      },
+    };
+  });
 }
 
 export function peekRule(id: number, domain: string): AllowRule {

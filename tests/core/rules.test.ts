@@ -65,6 +65,26 @@ describe('buildBlockRules', () => {
       },
     ]);
   });
+
+  it('excludes disabled subdomains of a blocked domain (a disabled host gets no blocking)', () => {
+    const s = state((s) => {
+      s.settings.activeProfileId = 'downtime';
+      const ov = emptyOverride();
+      ov.added.blockSites.push('example.com');
+      s.overrides.work = ov;
+      s.settings.disabledSites = ['WWW.Docs.Example.com', 'other.org'];
+    });
+    const rules = buildBlockRules(s, PAGE);
+    expect(rules.map((r) => r.condition)).toEqual([
+      {
+        regexFilter: '^.+$',
+        requestDomains: ['example.com'],
+        excludedRequestDomains: ['docs.example.com'],
+        resourceTypes: ['main_frame'],
+      },
+      { regexFilter: '^.+$', requestDomains: ['news.ycombinator.com'], resourceTypes: ['main_frame'] },
+    ]);
+  });
 });
 
 describe('peekRule', () => {

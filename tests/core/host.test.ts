@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hostMatches, normalizeHost } from '../../src/core/host';
+import { hostMatches, normalizeHost, webUrl } from '../../src/core/host';
 
 describe('normalizeHost', () => {
   it('strips scheme, path, port, www, wildcard and trailing dot, and lowercases', () => {
@@ -25,5 +25,15 @@ describe('hostMatches', () => {
 
   it('never matches an empty domain', () => {
     expect(hostMatches('reddit.com', '')).toBe(false);
+  });
+});
+
+describe('webUrl', () => {
+  it('accepts http(s) URLs only', () => {
+    expect(webUrl('https://news.ycombinator.com/item?id=1#c')).toBe('https://news.ycombinator.com/item?id=1#c');
+    expect(webUrl('http://example.org')).toBe('http://example.org/');
+    for (const bad of ['javascript:alert(1)', 'data:text/html,hi', 'chrome://settings', 'file:///etc/passwd', '', 'nope']) {
+      expect(webUrl(bad)).toBeNull();
+    }
   });
 });
