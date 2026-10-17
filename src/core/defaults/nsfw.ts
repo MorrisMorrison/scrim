@@ -1,0 +1,22 @@
+// Small and conservative: explicit terms only. Bare "sex" is left out (Essex, sextant,
+// sex education). Image-based NSFW detection is a later roadmap item.
+export const NSFW_KEYWORDS: string[] = [
+  'NSFW',
+  'porn',
+  'porno',
+  'pornography',
+  'pornographic',
+  'Pornhub',
+  'OnlyFans',
+  'xxx',
+  'hentai',
+  'nude',
+  'nudity',
+  'naked',
+  'sex tape',
+  'erotic',
+  'erotica',
+  'camgirl',
+  'Nacktbilder',
+  'Pornografie',
+];
