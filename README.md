@@ -4,15 +4,13 @@ A Chromium extension (Chrome, Edge, Brave) that hides whole **topics** across fe
 blocks sites per profile, and tames YouTube. It's the successor to
 [no-ai-filter](https://github.com/MorrisMorrison/no-ai-filter).
 
-- **Topics:** AI, Software/IT, Work, Politics, NSFW, or your own. Each has keywords (plain or `/regex/flags`),
-  typed sources (`r/sub`, `yt:@channel`, `x:@user`, `gh:owner`, domains) and sites to block outright.
-- **Profiles:** named bundles of topics, an action (hide, blur, collapse) and site tweaks. Switch from the popup.
-  Ships with **Default** (AI) and **Downtime** (AI + Work + Software/IT + YouTube tweaks).
+- **Topics:** AI, Software/IT, Work, Politics, NSFW, or your own.
+- **Profiles:** named bundles of topics, an action and site tweaks. Switch from the popup.
 - **Site blocking:** while a topic is active, its blocked sites redirect to a reminder page
   before they load. **Peek for 5 min** if you must.
 - **Tweaks:** hide YouTube Shorts, recommendations, end screens, comments and Explore; hide Google's AI Overview.
 - **Tuned sites:** Reddit, YouTube, X/Twitter, Hacker News, Google Search, Google News, GitHub.
-- Everything stays in your browser (`chrome.storage.local`). Export/import JSON for backups.
+- Everything stays in your browser (`chrome.storage.local`). Nothing is sent anywhere.
 
 ## Install
 
@@ -31,8 +29,55 @@ Open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked**,
 pnpm run update   # git pull + install + build into the same .output/chrome-mv3
 ```
 
-Then click **Reload Scrim** in the popup (or the reload icon in `chrome://extensions`).
-Settings are kept: an unpacked extension keeps its ID and storage as long as it's loaded from the same folder.
+Then click **Reload Scrim** in the popup. Your settings are kept, because an unpacked extension keeps its ID and
+storage as long as you load it from the same folder.
+
+## Using it
+
+**Popup** (toolbar icon):
+- master switch and profile switcher
+- "Off on this site"
+- how many items were hidden on the page, by topic
+- **Reveal hidden items**, which outlines what was hidden instead of removing it
+- a log of what was hidden and why
+
+**Options:**
+- **Profiles:** which topics are on, what happens to matches, and site tweaks.
+  - What happens to matches: **hide**, **blur** (click to reveal) or **collapse** to a small bar.
+- **Topics:** each topic has three lists. Shipped entries are marked *default*; removing one only hides it for you.
+  - **Keywords:** plain words or phrases, or `/regex/flags`.
+    - All-caps words of 2–5 letters (`AI`, `LLM`, `KI`) match case-sensitively, so "email" never hits "AI".
+    - Everything else matches case-insensitively, as whole words, with an optional plural *s*.
+  - **Sources:** hide everything from a source, whatever the wording:
+    - `r/subreddit`
+    - `yt:@channel`
+    - `x:@user`
+    - `gh:owner` (a GitHub user or org)
+    - a link domain such as `example.com`
+    - On a blocked source's own page (a subreddit, channel, profile or GitHub org), the whole page is covered.
+  - **Blocked sites:** domains that redirect to the block page while the topic is active.
+- **Sites:** domains where Scrim does nothing at all.
+- **Backup:** export or import everything as JSON, or reset to the defaults.
+- **Keyword tester:** paste a headline to see which topic and keyword would hide it.
+
+### Shipped topics and profiles
+
+| Topic | What it catches |
+|---|---|
+| AI | AI/LLM terms in English and German, AI products and vendors, AI subreddits (e.g. r/singularity, r/accelerate) |
+| Software/IT | programming terms, languages and tools, dev subreddits; blocks Hacker News |
+| Work | job, career and office terms in English and German, work subreddits (e.g. r/LinkedInLunatics, r/antiwork) |
+| Politics | political terms, parties and politicians (EN/DE), political subreddits |
+| NSFW | a small set of explicit terms |
+
+The **Default** profile hides AI. **Downtime** hides AI, Work and Software/IT and tames YouTube.
+Politics and NSFW ship turned off; switch them on in a profile.
+
+### Personal settings
+
+Your own work orgs, internal domains and extra sources belong in your browser's storage, not in this repo.
+To keep them across machines, export from **Options → Backup** and store the file somewhere private
+(e.g. a private git repo). Import it on a new install. Importing **replaces** all settings.
 
 ## Develop
 
@@ -43,25 +88,20 @@ pnpm typecheck
 pnpm lint
 ```
 
-Layout: `src/core` (pure logic, no DOM), `src/sites` (one adapter + tweaks per site),
-`src/content` (DOM engine), `src/background` (blocking, badge), `src/entrypoints` (WXT entry points and UI).
+Layout:
+- `src/core`: pure logic, no DOM
+- `src/sites`: one adapter plus its tweaks per site
+- `src/content`: DOM engine
+- `src/background`: blocking, badge
+- `src/entrypoints`: WXT entry points and UI
 
 ## When a site breaks
 
-Sites change their markup. Save the page's feed container
-(`copy($0.outerHTML)` in DevTools), add it under `tests/fixtures/<site>/`, write a failing
-test in `tests/sites/<site>.test.ts`, then fix the selector in `src/sites/<site>.ts`.
-
-## Manual test checklist
-
-- [ ] Each tuned site hides AI items with the Default profile; the popup count and badge match.
-- [ ] Reveal mode outlines hidden items; turning it off hides them again.
-- [ ] Downtime: Hacker News redirects to the block page; Peek for 5 min works and expires.
-- [ ] Downtime: YouTube Shorts, home and watch-page recommendations are hidden; `/shorts/<id>` opens in the player.
-- [ ] A `gh:<org>` Work source overlays that org's pages in Downtime.
-- [ ] Google's AI Overview is gone.
-- [ ] "Off on this site" and the master switch turn everything off immediately.
-- [ ] Export, reset and import restore custom topics and profiles.
+Sites change their markup.
+1. Save the page's feed container with `copy($0.outerHTML)` in DevTools.
+2. Add it under `tests/fixtures/<site>/`.
+3. Write a failing test in `tests/sites/<site>.test.ts`.
+4. Fix the selector in `src/sites/<site>.ts`.
 
 ## License
 
