@@ -169,6 +169,82 @@ describe('Engine', () => {
     expect(document.documentElement.classList.contains('scrim-reveal')).toBe(false);
   });
 
+  // Failure isolation: one broken item must never leave itself or later items stuck pending.
+  it.each([
+    [
+      'related() throws',
+      () => {
+        throw new Error('boom');
+      },
+    ],
+    ['related() returns a null entry', () => [null as unknown as Element]],
+  ])('fails open when %s, and still evaluates later items', (_name, related) => {
+    const broken: SiteAdapter = { ...adapter, related };
+    const e = setup('<div class="item" id="a">first LLM</div><div class="item" id="b">cats</div>', {
+      adapter: broken,
+    });
+    e.configure(config());
+    // The failing item is shown (pass), without a hide class, and not counted.
+    expect(state('a')).toBe('pass');
+    expect($('a').classList.contains('scrim-hidden')).toBe(false);
+    expect(e.total()).toBe(0);
+    // The later item was still evaluated rather than left pending.
+    expect(state('b')).toBe('pass');
+  });
+
+  it('a failing related() on one item does not stop later items from being hit', () => {
+    const flaky: SiteAdapter = {
+      ...adapter,
+      related: (el) => {
+        if (el.id === 'a') throw new Error('boom');
+        return [];
+      },
+    };
+    const e = setup('<div class="item" id="a">first LLM</div><div class="item" id="b">second LLM</div>', {
+      adapter: flaky,
+    });
+    e.configure(config());
+    expect(state('a')).toBe('pass');
+    expect(state('b')).toBe('hit:ai');
+    expect($('b').classList.contains('scrim-hidden')).toBe(true);
+    expect(e.total()).toBe(1);
+  });
+
+  it('a throwing onHit does not affect the hit item or later items', () => {
+    const onHit = vi.fn(() => {
+      throw new Error('Extension context invalidated');
+    });
+    const e = setup('<div class="item" id="a">first LLM</div><div class="item" id="b">second LLM</div>', {
+      onHit,
+    });
+    e.configure(config());
+    expect(state('a')).toBe('hit:ai');
+    expect($('a').classList.contains('scrim-hidden')).toBe(true);
+    expect(state('b')).toBe('hit:ai');
+    expect(onHit).toHaveBeenCalledTimes(2);
+    expect(e.total()).toBe(2);
+  });
+
+  it('does not scan from a queued frame after stop()', async () => {
+    const frames: FrameRequestCallback[] = [];
+    const raf = vi.spyOn(globalThis, 'requestAnimationFrame').mockImplementation((cb) => {
+      frames.push(cb);
+      return frames.length;
+    });
+    try {
+      const e = setup('');
+      e.configure(config());
+      e.start();
+      document.body.insertAdjacentHTML('beforeend', '<div class="item" id="n">late LLM post</div>');
+      await vi.waitFor(() => expect(frames).toHaveLength(1));
+      e.stop();
+      frames[0]?.(0);
+      expect(state('n')).toBeNull();
+    } finally {
+      raf.mockRestore();
+    }
+  });
+
   it('picks up items added after start()', async () => {
     const e = setup('');
     e.configure(config());

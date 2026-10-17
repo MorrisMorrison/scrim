@@ -1,10 +1,10 @@
 // Evaluates the current adapter's items against the compiled pipeline and applies the
 // profile's action. Fail-open by construction: unknown → shown after the timeout,
 // extract() errors → shown.
-import type { Action, SourceRef, Verdict } from '../core/model';
+import type { Action, Verdict } from '../core/model';
 import type { Pipeline } from '../core/pipeline';
 import type { SiteAdapter } from '../sites/types';
-import { applyAction, clearActions, SCRIM_ATTR } from './actions';
+import { applyAction, clearActions, failOpen, SCRIM_ATTR } from './actions';
 
 export const PENDING_TIMEOUT_MS = 800;
 export const LOG_LIMIT = 300;
@@ -55,38 +55,12 @@ export class Engine {
     let pending = false;
 
     for (const el of Array.from(doc.querySelectorAll(adapter.itemSelector))) {
-      if (el.hasAttribute(SCRIM_ATTR)) continue;
-      // Inside an already-hit item: hidden with its parent, never counted twice.
-      if (el.parentElement?.closest(`[${SCRIM_ATTR}^="hit"]`)) {
-        el.setAttribute(SCRIM_ATTR, 'pass');
-        continue;
-      }
-      let text: string;
-      let sources: SourceRef[];
+      // One broken item must never abort the loop: it would leave this item and every later
+      // one attribute-less, i.e. permanently invisible under the pre-hide stylesheet.
       try {
-        ({ text, sources } = adapter.extract(el));
+        if (this.evaluateItem(el, config, timeout, now)) pending = true;
       } catch {
-        el.setAttribute(SCRIM_ATTR, 'pass');
-        continue;
-      }
-      const verdict = config.pipeline.evaluate({ text: adapter.sourcesOnly ? '' : text, sources });
-      if (verdict) {
-        this.hit(el, verdict, text, config);
-        continue;
-      }
-      if (text.trim()) {
-        el.setAttribute(SCRIM_ATTR, 'pass');
-        continue;
-      }
-      // Feeds render empty shells and hydrate text later: wait, but not forever.
-      const seen = this.firstSeen.get(el);
-      if (seen === undefined) {
-        this.firstSeen.set(el, now);
-        pending = true;
-      } else if (now - seen >= timeout) {
-        el.setAttribute(SCRIM_ATTR, 'pass');
-      } else {
-        pending = true;
+        failOpen(el);
       }
     }
 
@@ -132,12 +106,44 @@ export class Engine {
     return Object.values(this.counts).reduce((a, b) => a + b, 0);
   }
 
+  // Returns true when the item is still pending (empty shell waiting for hydration).
+  private evaluateItem(el: Element, config: EngineConfig, timeout: number, now: number): boolean {
+    const { adapter } = this.opts;
+    if (el.hasAttribute(SCRIM_ATTR)) return false;
+    // Inside an already-hit item: hidden with its parent, never counted twice.
+    if (el.parentElement?.closest(`[${SCRIM_ATTR}^="hit"]`)) {
+      el.setAttribute(SCRIM_ATTR, 'pass');
+      return false;
+    }
+    const { text, sources } = adapter.extract(el);
+    const verdict = config.pipeline.evaluate({ text: adapter.sourcesOnly ? '' : text, sources });
+    if (verdict) {
+      this.hit(el, verdict, text, config);
+      return false;
+    }
+    if (text.trim()) {
+      el.setAttribute(SCRIM_ATTR, 'pass');
+      return false;
+    }
+    // Feeds render empty shells and hydrate text later: wait, but not forever.
+    const seen = this.firstSeen.get(el);
+    if (seen === undefined) {
+      this.firstSeen.set(el, now);
+      return true;
+    }
+    if (now - seen >= timeout) {
+      el.setAttribute(SCRIM_ATTR, 'pass');
+      return false;
+    }
+    return true;
+  }
+
   private schedule(): void {
-    if (this.frameQueued) return;
+    if (!this.observer || this.frameQueued) return;
     this.frameQueued = true;
     requestAnimationFrame(() => {
       this.frameQueued = false;
-      this.scan();
+      if (this.observer) this.scan();
     });
   }
 
@@ -153,7 +159,11 @@ export class Engine {
     this.log.push({ snippet, topicId: verdict.topicId, reason: verdict.reason });
     if (this.log.length > LOG_LIMIT) this.log.shift();
     this.counts[verdict.topicId] = (this.counts[verdict.topicId] ?? 0) + 1;
-    this.opts.onHit?.();
+    try {
+      this.opts.onHit?.();
+    } catch {
+      // A listener failure (e.g. extension context invalidated) must not affect scanning.
+    }
   }
 
   private reset(): void {

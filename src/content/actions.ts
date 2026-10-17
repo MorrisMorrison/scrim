@@ -64,6 +64,16 @@ function insertBar(el: Element, all: Element[], topicName: string): void {
   el.before(bar);
 }
 
+// Last-resort recovery when applying an action threw midway: show the item as normal.
+export function failOpen(el: Element): void {
+  try {
+    el.classList.remove(...ACTION_CLASSES);
+    el.setAttribute(SCRIM_ATTR, 'pass');
+  } catch {
+    // Nothing more can be done for this element.
+  }
+}
+
 export function clearActions(doc: Document): void {
   doc.querySelectorAll(`[${BAR_ATTR}]`).forEach((b) => b.remove());
   doc.querySelectorAll(`[${SCRIM_ATTR}]`).forEach((e) => {
