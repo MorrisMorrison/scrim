@@ -58,7 +58,7 @@ export async function runContent(
     peekTimer = setTimeout(() => void checkPage().catch(failOpen), Math.max(0, until - Date.now()) + 50);
   };
 
-  // url defaults to the committed location; SPA navigations pass the destination instead.
+  // url is always a committed URL (see content/navigation.ts); it defaults to location.href.
   async function checkPage(url: URL = new URL(location.href)): Promise<void> {
     const isCurrent = beginCheck();
     const ref = adapter.pageSource?.(url) ?? null;
