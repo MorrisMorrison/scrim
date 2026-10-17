@@ -2,16 +2,28 @@ import { hostMatches, normalizeHost } from '../core/host';
 import type { SourceRef } from '../core/model';
 import { sourceKey } from '../core/sources';
 
-// Text used for keyword matching. Includes image alt-text and aria-labels so image-only
+// Labels that describe content: image alt-text, and aria-labels of links and media.
+const LABELLED = 'img[alt], a[aria-label], img[aria-label], video[aria-label], svg[aria-label]';
+// Controls carry site chrome, not content (X puts a "Grok actions" button on every tweet).
+const CONTROL = 'button, [role="button"], [role^="menu"]';
+
+// Text used for keyword matching. Includes alt-text and link/media aria-labels so image-only
 // promoted posts (headline baked into the picture) are still caught.
 export function richText(el: Element): string {
   const base = (el as HTMLElement).innerText || el.textContent || '';
   const extras: string[] = [];
-  el.querySelectorAll('img[alt], [aria-label]').forEach((n) => {
+  el.querySelectorAll(LABELLED).forEach((n) => {
+    if (insideControl(n, el)) return;
     const label = n.getAttribute('alt') || n.getAttribute('aria-label');
     if (label) extras.push(label);
   });
   return [base, ...extras].join(' ').trim();
+}
+
+// Whether n is a control, or inside one, within the item (the item itself doesn't count).
+function insideControl(n: Element, item: Element): boolean {
+  const control = n.closest(CONTROL);
+  return control !== null && control !== item && item.contains(control);
 }
 
 export function dedupeSources(list: SourceRef[]): SourceRef[] {
