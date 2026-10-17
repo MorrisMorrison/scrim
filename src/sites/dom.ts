@@ -7,24 +7,37 @@ const LABELLED = 'img[alt], a[aria-label], img[aria-label], video[aria-label], s
 // Controls carry site chrome, not content (X puts a "Grok actions" button on every tweet).
 const CONTROL = 'button, [role="button"], [role^="menu"]';
 
-const NON_TEXT = new Set(['SCRIPT', 'STYLE']);
+const NON_TEXT = new Set(['script', 'style']);
+// Inline formatting: text on either side of these boundaries is one run ("Open<b>AI</b>" is
+// "OpenAI"). Every other element boundary (blocks, cells, list items, <br>…) separates words.
+const INLINE = new Set([
+  'a', 'abbr', 'b', 'bdi', 'bdo', 'cite', 'code', 'data', 'dfn', 'em', 'i', 'kbd', 'mark', 'q',
+  's', 'samp', 'small', 'span', 'strong', 'sub', 'sup', 'time', 'u', 'var', 'wbr',
+]);
+
+function collectText(node: Node, out: string[]): void {
+  for (let c = node.firstChild; c; c = c.nextSibling) {
+    if (c.nodeType === Node.TEXT_NODE) {
+      if (c.nodeValue) out.push(c.nodeValue);
+    } else if (c.nodeType === Node.ELEMENT_NODE) {
+      const tag = (c as Element).localName;
+      if (NON_TEXT.has(tag)) continue;
+      const inline = INLINE.has(tag);
+      if (!inline) out.push(' ');
+      collectText(c, out);
+      if (!inline) out.push(' ');
+    }
+  }
+}
 
 // Text used for keyword matching. Includes alt-text and link/media aria-labels so image-only
 // promoted posts (headline baked into the picture) are still caught.
 // Walks text nodes instead of reading innerText: the pre-hide CSS sets visibility:hidden, under
 // which Blink's innerText is "", and innerText forces a layout on every call.
 export function richText(el: Element): string {
-  const parts: string[] = [];
-  const doc = el.ownerDocument;
-  const walker = doc.createTreeWalker(el, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, {
-    acceptNode: (n) =>
-      n.nodeType === Node.ELEMENT_NODE && NON_TEXT.has((n as Element).tagName)
-        ? NodeFilter.FILTER_REJECT // skips the whole subtree
-        : NodeFilter.FILTER_ACCEPT,
-  });
-  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
-    if (n.nodeType === Node.TEXT_NODE && n.nodeValue) parts.push(n.nodeValue);
-  }
+  const text: string[] = [];
+  collectText(el, text);
+  const parts = [text.join('')];
   el.querySelectorAll(LABELLED).forEach((n) => {
     if (insideControl(n, el)) return;
     const label = n.getAttribute('alt') || n.getAttribute('aria-label');

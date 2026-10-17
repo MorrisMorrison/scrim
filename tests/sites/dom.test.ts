@@ -22,6 +22,20 @@ describe('richText', () => {
     expect(richText(el)).toBe('Title by author 3h');
   });
 
+  it('keeps words split across inline formatting elements together', () => {
+    const text = richText(item('Open<b>AI</b> news, <a href="/x">Chat</a><span>GPT</span>s<i>ize</i>d'));
+    expect(text).toContain('OpenAI');
+    expect(text.split(' ')).not.toContain('AI');
+    expect(text).toBe('OpenAI news, ChatGPTsized');
+  });
+
+  it('separates text at block, cell, list and line-break boundaries', () => {
+    expect(richText(item('<div>with AI</div><div>Fireship</div>'))).toBe('with AI Fireship');
+    expect(richText(item('<table><tr><td>a</td><td>b</td></tr></table><ul><li>c</li><li>d</li></ul>e<br>f'))).toBe(
+      'a b c d e f',
+    );
+  });
+
   it('includes image alt text', () => {
     expect(richText(item('<p>hello</p><img src="x.png" alt="Banner about LLM agents">'))).toContain(
       'Banner about LLM agents',
