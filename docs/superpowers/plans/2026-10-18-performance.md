@@ -142,3 +142,15 @@ Steps 1 and 2 are done. Measured with `pnpm bench` (happy-dom; the counts are ex
 | Nothing to filter: time | 17 ms | 9 ms |
 
 A document-wide look for unsettled items still runs at most every 2 s while the page is changing (`SAFETY_SCAN_MS`), so items that become matchable without being added (e.g. a class change) are still found.
+
+Steps 3 and 4 are done (`pnpm bench`, happy-dom):
+
+| Scenario | Before | After |
+|---|---|---|
+| AI Overview tweak, 100 churn frames: document-wide queries | 202 | 0 |
+| AI Overview tweak, 100 churn frames: time | 75 ms | 10 ms |
+| AI Overview tweak: late overview still hidden | yes | yes; the tweak stops watching after 15 s |
+| `linkDomains`, 50 items × 25 links (20 relative) | 172 ms | 6 ms; only absolute web links are parsed |
+| Source stage, 20k items × 3 sources × 11 topics | 38 ms | 22 ms; normalized once per item source |
+
+Remaining: step 5 (re-measure in real Chrome; P7 only if matching still shows up).

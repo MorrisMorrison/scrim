@@ -88,4 +88,30 @@ describe('linkDomains', () => {
       { kind: 'domain', host: 'example.org' },
     ]);
   });
+
+  it('only web links to other hosts become sources; relative links are never parsed', () => {
+    const el = item(
+      `<a href="/r/sub/comments/1">rel</a><a href="#top">hash</a><a href="?page=2">query</a>` +
+        `<a href="page.html">file</a><a href="mailto:a@b.example">mail</a><a href="javascript:void(0)">js</a>` +
+        `<a href="//cdn.example.com/x">protocol-relative</a><a href="https://ext.example.org/">ext</a>`,
+    );
+    const parsed: string[] = [];
+    const RealURL = URL;
+    globalThis.URL = class extends RealURL {
+      constructor(url: string | URL, base?: string | URL) {
+        super(url, base);
+        parsed.push(String(url));
+      }
+    } as typeof URL;
+    try {
+      const sources = linkDomains(el);
+      expect(sources).toEqual([
+        { kind: 'domain', host: 'cdn.example.com' },
+        { kind: 'domain', host: 'ext.example.org' },
+      ]);
+      expect(parsed).toEqual(['//cdn.example.com/x', 'https://ext.example.org/']);
+    } finally {
+      globalThis.URL = RealURL;
+    }
+  });
 });

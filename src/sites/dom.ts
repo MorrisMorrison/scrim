@@ -62,14 +62,23 @@ export function dedupeSources(list: SourceRef[]): SourceRef[] {
   });
 }
 
+// Absolute web links ("https://…", "http://…") and protocol-relative ones ("//host/…"). Anything
+// else (relative paths, "#…", "?…", mailto:, javascript:) can't point to another site, so it is
+// never parsed — most links on Reddit and X are relative.
+const WEB_LINK = /^(?:https?:)?\/\//i;
+
 // External link domains inside an item (same-site links are ignored).
 export function linkDomains(el: Element): SourceRef[] {
   const doc = el.ownerDocument;
   const here = normalizeHost(doc.location?.hostname ?? '');
+  let base: string | undefined; // read once, and only if a protocol-relative link needs it
   const out: SourceRef[] = [];
   el.querySelectorAll('a[href]').forEach((a) => {
+    const href = (a.getAttribute('href') ?? '').trim();
+    if (!WEB_LINK.test(href)) return;
     try {
-      const host = normalizeHost(new URL(a.getAttribute('href') ?? '', doc.baseURI).hostname);
+      const url = href.startsWith('//') ? new URL(href, (base ??= doc.baseURI)) : new URL(href);
+      const host = normalizeHost(url.hostname);
       if (host && !hostMatches(host, here)) out.push({ kind: 'domain', host });
     } catch {
       // malformed href: ignore

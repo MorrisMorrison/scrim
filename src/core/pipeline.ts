@@ -1,25 +1,29 @@
 // Ordered matching stages. v1 has two synchronous stages: sources (cheap, exact) then
 // keywords. The Stage interface is where a future async classifier would plug in.
-import { hostMatches } from './host';
+import { normalizedHostMatches, normalizeHost } from './host';
 import { compileKeywords, firstMatch } from './matcher';
 import type { ItemFacts, Stage, Topic, Verdict } from './model';
 import { formatSource, sourceKey } from './sources';
 
 export function sourceStage(topics: readonly Topic[]): Stage {
+  // Topic sources are normalized once here; each item source is normalized once per item,
+  // not once per topic.
   const compiled = topics.map((t) => ({
     id: t.id,
     keys: new Set(t.sources.filter((s) => s.kind !== 'domain').map(sourceKey)),
-    domains: t.sources.flatMap((s) => (s.kind === 'domain' ? [s.host] : [])),
+    domains: t.sources.flatMap((s) => (s.kind === 'domain' ? [normalizeHost(s.host)] : [])),
   }));
   return {
     id: 'source',
     evaluate(facts) {
       for (const src of facts.sources) {
+        const host = src.kind === 'domain' ? normalizeHost(src.host) : null;
+        const key = host === null ? sourceKey(src) : null;
         for (const t of compiled) {
           const hit =
-            src.kind === 'domain'
-              ? t.domains.some((d) => hostMatches(src.host, d))
-              : t.keys.has(sourceKey(src));
+            host !== null
+              ? t.domains.some((d) => normalizedHostMatches(host, d))
+              : t.keys.has(key as string);
           if (hit) return { topicId: t.id, reason: `source ${formatSource(src)}` };
         }
       }

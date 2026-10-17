@@ -13,9 +13,12 @@ export function normalizeHost(input: string): string {
 }
 
 export function hostMatches(host: string, domain: string): boolean {
-  const h = normalizeHost(host);
-  const d = normalizeHost(domain);
-  return d.length > 0 && (h === d || h.endsWith('.' + d));
+  return normalizedHostMatches(normalizeHost(host), normalizeHost(domain));
+}
+
+// hostMatches for values that are already normalized (hot paths normalize once up front).
+export function normalizedHostMatches(host: string, domain: string): boolean {
+  return domain.length > 0 && (host === domain || host.endsWith('.' + domain));
 }
 
 // The URL, normalized, if it is a web page (http/https); null for anything else
