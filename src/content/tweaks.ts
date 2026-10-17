@@ -18,8 +18,12 @@ export class TweakManager {
 
     for (const [id, cleanup] of this.cleanups) {
       if (!enabled[id]) {
-        cleanup();
         this.cleanups.delete(id);
+        try {
+          cleanup();
+        } catch (e) {
+          console.warn('[scrim] tweak cleanup failed', id, e);
+        }
       }
     }
     for (const t of on) {
@@ -27,6 +31,8 @@ export class TweakManager {
       try {
         this.cleanups.set(t.id, t.run(this.doc));
       } catch (e) {
+        // Record a no-op so a failing behaviour is attempted once per enable, not on every apply().
+        this.cleanups.set(t.id, () => {});
         console.warn('[scrim] tweak failed', t.id, e);
       }
     }
