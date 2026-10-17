@@ -30,12 +30,18 @@ const OVERLAY_CSS = `
 #scrim-block button:hover { color: #bbb; }
 `;
 
+// Shows the overlay, or replaces what an existing one says (SPA navigation between two
+// blocked pages). Attached to <html>, not <body>: GitHub's Turbo swaps <body> on navigation.
 export function showPageBlock(doc: Document, content: OverlayContent): void {
-  if (doc.getElementById(OVERLAY_ID)) return;
   setStyle(doc, STYLE_IDS.overlay, OVERLAY_CSS);
 
-  const overlay = doc.createElement('div');
-  overlay.id = OVERLAY_ID;
+  let overlay = doc.getElementById(OVERLAY_ID);
+  if (!overlay) {
+    overlay = doc.createElement('div');
+    overlay.id = OVERLAY_ID;
+    doc.documentElement.appendChild(overlay);
+  }
+
   const card = doc.createElement('div');
   card.className = 'scrim-card';
 
@@ -57,8 +63,7 @@ export function showPageBlock(doc: Document, content: OverlayContent): void {
   });
 
   card.append(emoji, msg, sub, peek);
-  overlay.append(card);
-  (doc.body ?? doc.documentElement).appendChild(overlay);
+  overlay.replaceChildren(card);
 }
 
 export function hidePageBlock(doc: Document): void {

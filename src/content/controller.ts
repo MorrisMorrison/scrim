@@ -18,13 +18,14 @@ import { isPeeking, startPeek } from '../platform/peek';
 import { tweaksForSite } from '../sites';
 import type { SiteAdapter } from '../sites/types';
 import { Engine } from './engine';
+import { latestRun } from './latest';
 import { hidePageBlock, showPageBlock } from './overlay';
 import { ACTION_CSS, prehideCss, setStyle, STYLE_IDS } from './styles';
 import { TweakManager } from './tweaks';
 
 export async function runContent(
   adapter: SiteAdapter,
-  onNavigate: (cb: () => void) => void,
+  onNavigate: (cb: (url: URL) => void) => void,
 ): Promise<void> {
   const doc = document;
   let state: ScrimState;
@@ -48,10 +49,17 @@ export async function runContent(
     setStyle(doc, STYLE_IDS.prehide, null);
   };
 
-  async function checkPage(): Promise<void> {
-    const ref = adapter.pageSource?.(new URL(location.href)) ?? null;
+  const beginCheck = latestRun();
+
+  // url defaults to the committed location; SPA navigations pass the destination instead.
+  async function checkPage(url: URL = new URL(location.href)): Promise<void> {
+    const isCurrent = beginCheck();
+    const ref = adapter.pageSource?.(url) ?? null;
     const verdict = ref ? pipeline.evaluate({ text: '', sources: [ref] }) : null;
-    if (!ref || !verdict || (await isPeeking(sourceKey(ref)))) {
+    const peeking = ref && verdict ? await isPeeking(sourceKey(ref)) : false;
+    // A newer navigation started while we awaited: it owns the overlay now.
+    if (!isCurrent()) return;
+    if (!ref || !verdict || peeking) {
       hidePageBlock(doc);
       return;
     }
@@ -105,7 +113,7 @@ export async function runContent(
       .catch(failOpen);
   });
 
-  onNavigate(() => void checkPage().catch(failOpen));
+  onNavigate((url) => void checkPage(url).catch(failOpen));
 
   browser.runtime.onMessage.addListener((msg: Message, _sender, sendResponse) => {
     if (msg.type === 'scrim:reveal') {
