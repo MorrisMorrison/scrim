@@ -71,6 +71,9 @@ storage as long as you load it from the same folder.
 | Crypto & markets | crypto, coins, trading and stock-market chatter (EN/DE), r/wallstreetbets, r/CryptoCurrency and similar |
 | Hustle & self-improvement | side hustles, passive income, grindset and guru phrases, r/sidehustle, r/Entrepreneur and similar |
 | Ragebait & clickbait | clickbait phrases and SHOUTING headlines ("DESTROYS", "SHOCKING"), freakout subreddits |
+| Doomscroll news | war, attacks and disasters (EN/DE), r/worldnews, r/news, war-footage subreddits |
+| Celebrity & gossip | celebrities, red carpets, reality TV, influencer drama, Promis, r/Fauxmoi and similar |
+| Spoilers | a template: generic spoiler markers ("ending explained", "season finale"). Add the shows, games or teams you're catching up on as keywords |
 | NSFW | a small set of explicit terms |
 
 The **Default** profile hides AI. **Downtime** hides AI, Work and Software/IT and tames YouTube.

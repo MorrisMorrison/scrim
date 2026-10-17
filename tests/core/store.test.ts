@@ -83,7 +83,7 @@ describe('derived reads', () => {
     expect(activeProfile(s).id).toBe('default');
     expect(activeTopics(s).map((t) => t.id)).toEqual(['ai']);
     expect(activeTopics(s)[0]!.keywords).toContain('Claude Code');
-    expect(allTopics(s).map((t) => t.id)).toEqual(['ai', 'software', 'work', 'politics', 'markets', 'hustle', 'ragebait', 'nsfw', 'crypto']);
+    expect(allTopics(s).map((t) => t.id)).toEqual(['ai', 'software', 'work', 'politics', 'markets', 'hustle', 'ragebait', 'news', 'gossip', 'spoilers', 'nsfw', 'crypto']);
   });
 
   it('fall back to the first profile when the active id is unknown', () => {

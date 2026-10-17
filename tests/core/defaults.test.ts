@@ -9,7 +9,19 @@ const hits = (id: keyof typeof BUILTIN_TOPICS, text: string) =>
 
 describe('shipped topics', () => {
   it('are consistent and free of duplicate entries', () => {
-    expect(BUILTIN_TOPIC_IDS).toEqual(['ai', 'software', 'work', 'politics', 'markets', 'hustle', 'ragebait', 'nsfw']);
+    expect(BUILTIN_TOPIC_IDS).toEqual([
+      'ai',
+      'software',
+      'work',
+      'politics',
+      'markets',
+      'hustle',
+      'ragebait',
+      'news',
+      'gossip',
+      'spoilers',
+      'nsfw',
+    ]);
     for (const id of BUILTIN_TOPIC_IDS) {
       const t = BUILTIN_TOPICS[id];
       expect(t.id).toBe(id);
@@ -39,6 +51,8 @@ describe('default sources', () => {
     expect(topicOf('wallstreetbets')).toBe('markets');
     expect(topicOf('sidehustle')).toBe('hustle');
     expect(topicOf('PublicFreakout')).toBe('ragebait');
+    expect(topicOf('worldnews')).toBe('news');
+    expect(topicOf('Fauxmoi')).toBe('gossip');
     expect(topicOf('gardening')).toBeNull();
   });
 });
@@ -135,6 +149,32 @@ const topicCases: [keyof typeof BUILTIN_TOPICS, string[], string[]][] = [
       'Politiker rastet im Interview aus',
     ],
     ['a shocking amount of rain today', 'the door slams shut', 'the storm destroyed the old barn'],
+  ],
+  [
+    'news',
+    [
+      'Missile strike hits apartment block',
+      'Death toll rises after earthquake',
+      'War crimes investigation opened',
+      'Anschlag in der Innenstadt',
+      'Neue Kämpfe an der Front im Krieg',
+    ],
+    ['Star Wars marathon tonight', 'the shooting guard scored 30 points', 'a flood of new ideas'],
+  ],
+  [
+    'gossip',
+    [
+      'Celebrity couple splits after 3 years',
+      'Every look from the Met Gala red carpet',
+      'Taylor Swift fans react to new album',
+      'Die Promis im Dschungelcamp',
+    ],
+    ['tea time with grandma', 'we bought a red rug for the hall', 'my sister swims fast'],
+  ],
+  [
+    'spoilers',
+    ['Ending explained: what that final scene means', 'Major spoilers ahead!', 'The post-credits scene sets up a sequel'],
+    ['the season starts in May', 'a quiet evening with a good book'],
   ],
 ];
 

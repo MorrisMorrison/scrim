@@ -1,11 +1,14 @@
 import type { BuiltinTopicId, GlobalSettings, Profile, Topic } from '../model';
 import { AI_KEYWORDS, AI_SOURCES } from './ai';
+import { GOSSIP_KEYWORDS, GOSSIP_SOURCES } from './gossip';
 import { HUSTLE_KEYWORDS, HUSTLE_SOURCES } from './hustle';
 import { MARKETS_KEYWORDS, MARKETS_SOURCES } from './markets';
+import { NEWS_KEYWORDS, NEWS_SOURCES } from './news';
 import { NSFW_KEYWORDS } from './nsfw';
 import { POLITICS_KEYWORDS, POLITICS_SOURCES } from './politics';
 import { RAGEBAIT_KEYWORDS, RAGEBAIT_SOURCES } from './ragebait';
 import { SOFTWARE_KEYWORDS, SOFTWARE_SOURCES } from './software';
+import { SPOILER_KEYWORDS } from './spoilers';
 import { WORK_KEYWORDS, WORK_SOURCES } from './work';
 
 export const BUILTIN_TOPIC_IDS: readonly BuiltinTopicId[] = [
@@ -16,6 +19,9 @@ export const BUILTIN_TOPIC_IDS: readonly BuiltinTopicId[] = [
   'markets',
   'hustle',
   'ragebait',
+  'news',
+  'gossip',
+  'spoilers',
   'nsfw',
 ];
 
@@ -59,6 +65,22 @@ export const BUILTIN_TOPICS: Readonly<Record<BuiltinTopicId, Topic>> = {
     sources: RAGEBAIT_SOURCES,
     blockSites: [],
   },
+  news: {
+    id: 'news',
+    name: 'Doomscroll news',
+    keywords: NEWS_KEYWORDS,
+    sources: NEWS_SOURCES,
+    blockSites: [],
+  },
+  gossip: {
+    id: 'gossip',
+    name: 'Celebrity & gossip',
+    keywords: GOSSIP_KEYWORDS,
+    sources: GOSSIP_SOURCES,
+    blockSites: [],
+  },
+  // A template: add the shows, games or teams you're catching up on as keywords.
+  spoilers: { id: 'spoilers', name: 'Spoilers', keywords: SPOILER_KEYWORDS, sources: [], blockSites: [] },
   nsfw: { id: 'nsfw', name: 'NSFW', keywords: NSFW_KEYWORDS, sources: [], blockSites: [] },
 };
 
