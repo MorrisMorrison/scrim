@@ -345,6 +345,74 @@ describe('Engine', () => {
       await vi.waitFor(() => expect(state('a')).toBe('hit:ai'));
     });
 
+    it('a link that hydrates after the text upgrades the fingerprint without re-hitting', () => {
+      const e = setup('<div class="item" id="a"><a id="l">an LLM post</a></div>');
+      e.configure(config('blur'));
+      expect(state('a')).toBe('hit:ai');
+      $('a').click(); // the user unblurs it
+      $('l').setAttribute('href', '/p/1');
+      e.scan();
+      expect(state('a')).toBe('hit:ai');
+      expect($('a').classList.contains('scrim-blurred')).toBe(false);
+      expect(e.total()).toBe(1);
+      expect(e.getLog()).toHaveLength(1);
+      // Now fingerprinted by the link: text changes under the same link are the same item.
+      $('l').textContent = 'an LLM post · 2 comments';
+      e.scan();
+      expect($('a').classList.contains('scrim-blurred')).toBe(false);
+      expect(e.total()).toBe(1);
+    });
+
+    it('a failure while clearing one reused item never aborts the pass', () => {
+      const withRelated: SiteAdapter = { ...adapter, related: (el) => [el.nextElementSibling as Element] };
+      const e = setup(
+        '<div class="item" id="a"><a href="/v/1">LLM</a></div><div id="am">meta</div>' +
+          '<div class="item" id="b"><a href="/v/2">cats</a></div><div id="bm">meta</div>',
+        { adapter: withRelated },
+      );
+      e.configure(config());
+      expect(state('a')).toBe('hit:ai');
+      Object.defineProperty($('am'), 'removeAttribute', {
+        value: () => {
+          throw new Error('boom');
+        },
+      });
+      $('a').innerHTML = '<a href="/v/3">dogs</a>';
+      $('b').innerHTML = '<a href="/v/4">an LLM explainer</a>';
+      expect(() => e.scan()).not.toThrow();
+      expect(state('a')).toBe('pass'); // failed open, never left pre-hidden
+      expect($('a').classList.contains('scrim-hidden')).toBe(false);
+      expect(state('b')).toBe('hit:ai');
+    });
+
+    it('caps the set of changed nodes and falls back to a full scan', async () => {
+      const frames: FrameRequestCallback[] = [];
+      const raf = vi.spyOn(globalThis, 'requestAnimationFrame').mockImplementation((cb) => {
+        frames.push(cb);
+        return frames.length;
+      });
+      try {
+        const boxes = Array.from({ length: 600 }, (_, i) => `<div id="box${i}"></div>`).join('');
+        const e = setup(`<div class="item" id="a"><a href="/v/1">cats</a></div>${boxes}`);
+        e.configure(config());
+        e.start();
+        const link = $('a').querySelector('a') as HTMLAnchorElement;
+        link.setAttribute('href', '/v/2');
+        (link.firstChild as Text).data = 'an LLM post';
+        // A background tab gets no frames while mutations keep arriving.
+        for (let i = 0; i < 600; i++) $(`box${i}`).appendChild(document.createElement('span'));
+        await new Promise((r) => setTimeout(r, 0));
+        const touched = (e as unknown as { touched: Set<Node> }).touched;
+        expect(touched.size).toBeLessThanOrEqual(500);
+        expect(state('a')).toBe('pass');
+        for (const frame of frames.splice(0)) frame(0);
+        // The changed item's entry was dropped with the overflow; the full scan still finds it.
+        expect(state('a')).toBe('hit:ai');
+      } finally {
+        raf.mockRestore();
+      }
+    });
+
     it('after start(), a frame only re-checks the items that mutated', async () => {
       const extract = vi.fn(adapter.extract);
       const e = setup('<div class="item" id="a">cats</div><div class="item" id="b">dogs</div>', {

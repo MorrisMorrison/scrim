@@ -11,7 +11,10 @@
 //   changed; the next frame re-checks only the settled items containing them.
 // - A linked item is re-checked by comparing one attribute; only a changed or link-less
 //   item is extracted.
-// - An explicit scan() re-checks every settled item.
+// - An explicit scan() re-checks every settled item; so does the next pass once more than
+//   TOUCHED_LIMIT nodes changed (the set is dropped rather than grown).
+// - A text-fingerprinted item whose link hydrates later (same text) is re-fingerprinted by
+//   link, not cleared and re-hit.
 // A settled item whose fingerprint changed is cleared and evaluated afresh.
 import type { Action, ItemFacts, Verdict } from '../core/model';
 import type { Pipeline } from '../core/pipeline';
@@ -22,6 +25,9 @@ export const PENDING_TIMEOUT_MS = 800;
 export const LOG_LIMIT = 300;
 export const LOG_VIEW = 100;
 const FINGERPRINT_TEXT = 100;
+// Past this many changed nodes, re-check everything instead (background tabs get no frames,
+// and the set would otherwise pin detached nodes indefinitely).
+export const TOUCHED_LIMIT = 500;
 
 export interface LogEntry {
   snippet: string;
@@ -47,8 +53,12 @@ function linkPrint(el: Element): string | null {
   return href ? `link:${href}` : null;
 }
 
+function textPrint(text: string): string {
+  return `text:${text.slice(0, FINGERPRINT_TEXT)}`;
+}
+
 function fingerprint(el: Element, text: string): string {
-  return linkPrint(el) ?? `text:${text.slice(0, FINGERPRINT_TEXT)}`;
+  return linkPrint(el) ?? textPrint(text);
 }
 
 // What a hit changed besides the item itself, so it can be undone when the element is reused.
@@ -64,6 +74,8 @@ export class Engine {
   private marks = new WeakMap<Element, Marks>();
   // Nodes the observer saw change since the last frame.
   private touched = new Set<Node>();
+  // The touched set overflowed: the next pass re-checks every settled item.
+  private rescanAll = false;
   private log: LogEntry[] = [];
   private counts: Record<string, number> = {};
   private observer: MutationObserver | null = null;
@@ -82,13 +94,21 @@ export class Engine {
   scan(): void {
     const { adapter, doc } = this.opts;
     this.touched.clear();
+    this.rescanAll = false;
     this.run(Array.from(doc.querySelectorAll(`:is(${adapter.itemSelector})[${SCRIM_ATTR}]`)));
   }
 
   start(): void {
     if (this.observer) return;
     this.observer = new MutationObserver((records) => {
-      for (const r of records) this.touched.add(r.target);
+      for (const r of records) {
+        if (this.rescanAll) break;
+        this.touched.add(r.target);
+        if (this.touched.size > TOUCHED_LIMIT) {
+          this.touched.clear();
+          this.rescanAll = true;
+        }
+      }
       this.schedule();
     });
     this.observer.observe(this.opts.doc.documentElement, {
@@ -104,6 +124,7 @@ export class Engine {
     this.observer?.disconnect();
     this.observer = null;
     this.touched.clear();
+    this.rescanAll = false;
     if (this.pendingTimer !== null) clearTimeout(this.pendingTimer);
     this.pendingTimer = null;
   }
@@ -148,18 +169,24 @@ export class Engine {
     };
 
     for (const el of settled) {
-      const before = this.fingerprints.get(el);
-      if (before === undefined || !el.hasAttribute(SCRIM_ATTR)) continue;
-      if (linkPrint(el) === before) continue; // same link: same item, whatever its text does
-      let facts: ItemFacts;
       try {
-        facts = adapter.extract(el);
+        const before = this.fingerprints.get(el);
+        if (before === undefined || !el.hasAttribute(SCRIM_ATTR)) continue;
+        if (linkPrint(el) === before) continue; // same link: same item, whatever its text does
+        const facts = adapter.extract(el); // throws → keeps its current state (see catch)
+        const current = fingerprint(el, facts.text);
+        if (current === before) continue;
+        if (before === textPrint(facts.text)) {
+          // Same text, and a link has hydrated since: same item, just fingerprint it by link.
+          this.fingerprints.set(el, current);
+          continue;
+        }
+        this.forget(el);
+        visit(el, facts);
       } catch {
-        continue; // keep its current state
+        // A half-cleared item must never stay attribute-less (pre-hidden): show it.
+        if (!el.hasAttribute(SCRIM_ATTR)) failOpen(el);
       }
-      if (fingerprint(el, facts.text) === before) continue;
-      this.forget(el);
-      visit(el, facts);
     }
 
     for (const el of Array.from(doc.querySelectorAll(`:is(${adapter.itemSelector}):not([${SCRIM_ATTR}])`))) {
@@ -176,6 +203,10 @@ export class Engine {
 
   // Incremental pass: unsettled items, plus settled items that contain a changed node.
   private update(): void {
+    if (this.rescanAll) {
+      this.scan();
+      return;
+    }
     const sel = `:is(${this.opts.adapter.itemSelector})[${SCRIM_ATTR}]`;
     const settled = new Set<Element>();
     for (const node of this.touched) {
@@ -278,6 +309,7 @@ export class Engine {
     this.fingerprints = new WeakMap();
     this.marks = new WeakMap();
     this.touched.clear();
+    this.rescanAll = false;
     this.log = [];
     this.counts = {};
     if (this.pendingTimer !== null) clearTimeout(this.pendingTimer);
