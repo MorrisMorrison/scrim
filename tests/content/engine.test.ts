@@ -33,6 +33,12 @@ const config = (action: Action = 'hide') => ({
 const $ = (id: string) => document.getElementById(id) as HTMLElement;
 const state = (id: string) => $(id).getAttribute('data-scrim');
 
+// Lets the observer's microtask run, then the frame it queued.
+async function nextFrame(): Promise<void> {
+  await Promise.resolve();
+  for (let i = 0; i < 2; i++) await new Promise((r) => requestAnimationFrame(() => r(undefined)));
+}
+
 let engine: Engine | null = null;
 function setup(html: string, opts: Partial<EngineOptions> = {}): Engine {
   document.body.innerHTML = html;
@@ -292,12 +298,50 @@ describe('Engine', () => {
       expect(e.total()).toBe(1);
     });
 
-    it('after start(), an in-place text change re-evaluates the item', async () => {
+    it('a passed item whose link changes to a new target with an LLM title becomes a hit', () => {
+      const e = setup('<div class="item" id="a"><a href="/v/1">cats</a> <span>3 hr. ago</span></div>');
+      e.configure(config());
+      expect(state('a')).toBe('pass');
+      const link = $('a').querySelector('a') as HTMLAnchorElement;
+      link.setAttribute('href', '/v/2');
+      link.textContent = 'an LLM explainer';
+      e.scan();
+      expect(state('a')).toBe('hit:ai');
+      expect(e.total()).toBe(1);
+    });
+
+    it('a hit item whose non-link text changes keeps its state, reveal and count', async () => {
+      const e = setup('<div class="item" id="a"><a href="/v/1">LLM news</a> <span id="t">3 hr. ago</span></div>');
+      e.configure(config('blur'));
+      e.start();
+      $('a').click(); // the user unblurs it
+      expect($('a').classList.contains('scrim-blurred')).toBe(false);
+      $('t').textContent = '4 hr. ago';
+      await nextFrame();
+      e.scan();
+      expect(state('a')).toBe('hit:ai');
+      expect($('a').classList.contains('scrim-blurred')).toBe(false);
+      expect(e.total()).toBe(1);
+      expect(e.getLog()).toHaveLength(1);
+    });
+
+    it('an item without a link falls back to its text', () => {
       const e = setup('<div class="item" id="a">cats</div>');
+      e.configure(config());
+      $('a').textContent = 'an LLM post';
+      e.scan();
+      expect(state('a')).toBe('hit:ai');
+    });
+
+    it('after start(), a link change alone re-evaluates the item', async () => {
+      const e = setup('<div class="item" id="a"><a href="/v/1">cats</a></div>');
       e.configure(config());
       e.start();
       expect(state('a')).toBe('pass');
-      ($('a').firstChild as Text).data = 'an LLM post';
+      const link = $('a').querySelector('a') as HTMLAnchorElement;
+      // In-place text update (no childList record): only the href change reports the reuse.
+      (link.firstChild as Text).data = 'an LLM post';
+      link.setAttribute('href', '/v/2');
       await vi.waitFor(() => expect(state('a')).toBe('hit:ai'));
     });
 

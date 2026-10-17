@@ -3,11 +3,15 @@
 // extract() errors → shown.
 //
 // Feeds reuse item elements for new content (YouTube, Reddit), so a settled item keeps a
-// fingerprint (first link + start of its text). Keeping that correct and cheap:
+// fingerprint: its first link (recycled tiles point somewhere new), or, for an item without
+// links, the start of its text. Live text ("3 hr. ago", view counts) never changes a linked
+// item's fingerprint, so it is never cleared, re-hidden or counted twice. Keeping it cheap:
 // - Each pass queries only unsettled items (`:not([data-scrim])`), never the whole feed.
-// - The MutationObserver also watches text and href changes and remembers which nodes
+// - The MutationObserver watches childList and href changes and remembers which nodes
 //   changed; the next frame re-checks only the settled items containing them.
-// - An explicit scan() re-checks every settled item (one extract per item).
+// - A linked item is re-checked by comparing one attribute; only a changed or link-less
+//   item is extracted.
+// - An explicit scan() re-checks every settled item.
 // A settled item whose fingerprint changed is cleared and evaluated afresh.
 import type { Action, ItemFacts, Verdict } from '../core/model';
 import type { Pipeline } from '../core/pipeline';
@@ -38,9 +42,13 @@ export interface EngineOptions {
   onHit?: () => void;
 }
 
+function linkPrint(el: Element): string | null {
+  const href = el.querySelector('a[href]')?.getAttribute('href');
+  return href ? `link:${href}` : null;
+}
+
 function fingerprint(el: Element, text: string): string {
-  const href = el.querySelector('a[href]')?.getAttribute('href') ?? '';
-  return `${href}\n${text.slice(0, FINGERPRINT_TEXT)}`;
+  return linkPrint(el) ?? `text:${text.slice(0, FINGERPRINT_TEXT)}`;
 }
 
 // What a hit changed besides the item itself, so it can be undone when the element is reused.
@@ -86,7 +94,6 @@ export class Engine {
     this.observer.observe(this.opts.doc.documentElement, {
       childList: true,
       subtree: true,
-      characterData: true,
       attributes: true,
       attributeFilter: ['href'],
     });
@@ -143,6 +150,7 @@ export class Engine {
     for (const el of settled) {
       const before = this.fingerprints.get(el);
       if (before === undefined || !el.hasAttribute(SCRIM_ATTR)) continue;
+      if (linkPrint(el) === before) continue; // same link: same item, whatever its text does
       let facts: ItemFacts;
       try {
         facts = adapter.extract(el);
