@@ -1,0 +1,33 @@
+# Dependabot version updates. Minor/patch bumps are grouped into one PR per
+# ecosystem; majors come as their own PRs so they get a proper look.
+version: 2
+updates:
+  # pnpm workspace (package.json + pnpm-lock.yaml at the repo root)
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      npm:
+        update-types: ["minor", "patch"]
+    ignore:
+      # TypeScript is pinned to ~6: svelte-check doesn't support TS 7 yet.
+      # Lift once it does.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+
+  # GitHub Actions used by .github/workflows
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      actions:
+        patterns: ["*"]
