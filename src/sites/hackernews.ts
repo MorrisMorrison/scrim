@@ -35,4 +35,6 @@ export const hackerNews: SiteAdapter = {
     }
     return out;
   },
+  // Story lists; an item page (/item?id=…) has comments, not stories.
+  expectsItems: (url) => /^\/($|(news|newest|front|best|ask|show)\b)/.test(url.pathname),
 };

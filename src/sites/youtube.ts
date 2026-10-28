@@ -32,6 +32,8 @@ export const youtube: SiteAdapter = {
     const handle = handleFromHref(url.pathname);
     return handle ? { kind: 'channel', handle } : null;
   },
+  // Home grid, search results, the watch-page sidebar and subscriptions.
+  expectsItems: (url) => /^\/($|results|watch|feed\/subscriptions)/.test(url.pathname),
 };
 
 export function shortsRedirectTarget(url: URL): string | null {

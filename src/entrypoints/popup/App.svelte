@@ -15,6 +15,14 @@
   let host = $state('');
   let info = $state<LogResponse | null>(null);
   let showLog = $state(false);
+  let copied = $state(false);
+
+  async function copyDiagnostics() {
+    if (!info) return;
+    await navigator.clipboard.writeText(JSON.stringify(info.diagnostics, null, 2));
+    copied = true;
+    setTimeout(() => (copied = false), 1500);
+  }
 
   const topicNames = $derived(
     store.state ? Object.fromEntries(allTopics(store.state).map((t) => [t.id, t.name])) : {},
@@ -101,6 +109,13 @@
 
     {#if info}
       <section>
+        <p class="health {info.health.status}" role="status">
+          {info.health.status === 'warn' ? '⚠' : info.health.status === 'ok' ? '✓' : '·'}
+          {info.health.message}
+        </p>
+        {#if info.health.status === 'warn'}
+          <button class="link" onclick={copyDiagnostics}>{copied ? 'Copied' : 'Copy diagnostics'}</button>
+        {/if}
         <p><strong>{info.total}</strong> hidden on this page</p>
         {#if info.total > 0}
           <ul class="counts">
@@ -146,6 +161,10 @@
   main { width: 320px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
   header { display: flex; justify-content: space-between; align-items: center; }
   h1 { font-size: 16px; margin: 0; }
+  .health { font-size: 13px; }
+  .health.ok { color: var(--muted); }
+  .health.idle { color: var(--muted); }
+  .health.warn { color: var(--accent); font-weight: 600; }
   p { margin: 0; }
   section { display: flex; flex-direction: column; gap: 6px; }
   .counts { margin: 0; padding-left: 18px; }

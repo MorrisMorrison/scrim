@@ -15,6 +15,9 @@ export interface SiteAdapter {
   related?(el: Element): Element[];
   // The source that owns the current page (a subreddit, channel, GitHub owner…).
   pageSource?(url: URL): SourceRef | null;
+  // Whether this page is a feed the adapter should find items on. The health check only warns
+  // about "no items" where this is true (missing = never warn).
+  expectsItems?(url: URL): boolean;
 }
 
 export interface Tweak {

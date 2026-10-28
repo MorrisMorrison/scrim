@@ -1,5 +1,6 @@
 // Glue between storage, the engine, tweaks and the page-block overlay for one tab.
 import { browser } from 'wxt/browser';
+import { assessHealth } from '../core/health';
 import { blockMessage } from '../core/messages';
 import { buildPipeline, type Pipeline } from '../core/pipeline';
 import { formatSource, sourceKey } from '../core/sources';
@@ -13,7 +14,7 @@ import {
   type ScrimState,
 } from '../core/store';
 import { localKV, onStoreChanged } from '../platform/kv';
-import type { LogResponse, Message } from '../platform/messages';
+import type { Diagnostics, LogResponse, Message } from '../platform/messages';
 import { peekEnd, startPeek } from '../platform/peek';
 import { tweaksForSite } from '../sites';
 import type { SiteAdapter } from '../sites/types';
@@ -28,6 +29,7 @@ export async function runContent(
   onNavigate: (cb: (url: URL) => void) => void,
 ): Promise<void> {
   const doc = document;
+  const startedAt = Date.now();
   let state: ScrimState;
   let pipeline: Pipeline = buildPipeline([]);
   let countTimer: ReturnType<typeof setTimeout> | undefined;
@@ -109,6 +111,27 @@ export async function runContent(
     }
   }
 
+  // Site health for the popup: is the adapter still finding and reading this site's items?
+  function healthReport(): Pick<LogResponse, 'health' | 'diagnostics'> {
+    const stats = engine.getStats();
+    const health = assessHealth({
+      site: adapter.label,
+      active: !pipeline.empty,
+      expectsItems: adapter.expectsItems?.(new URL(location.href)) ?? false,
+      elapsedMs: Date.now() - startedAt,
+      stats,
+    });
+    const diagnostics: Diagnostics = {
+      scrim: browser.runtime.getManifest().version,
+      site: adapter.id,
+      path: location.pathname,
+      itemSelector: adapter.itemSelector,
+      status: health.status,
+      ...stats,
+    };
+    return { health, diagnostics };
+  }
+
   setStyle(doc, STYLE_IDS.actions, ACTION_CSS);
   try {
     state = await loadState(localKV);
@@ -141,6 +164,7 @@ export async function runContent(
         counts: engine.getCounts(),
         total: engine.total(),
         revealed: engine.isRevealed(),
+        ...healthReport(),
       };
       sendResponse(response);
     }

@@ -20,6 +20,7 @@
 //   matchable without being added, e.g. a class change).
 // - With nothing to filter (no active topics), the observer is disconnected entirely.
 // A settled item whose fingerprint changed is cleared and evaluated afresh.
+import type { HealthStats } from '../core/health';
 import type { Action, ItemFacts, Verdict } from '../core/model';
 import type { Pipeline } from '../core/pipeline';
 import type { SiteAdapter } from '../sites/types';
@@ -108,6 +109,8 @@ export class Engine {
   private started = false;
   private log: LogEntry[] = [];
   private counts: Record<string, number> = {};
+  // Site health (see core/health.ts): plain counters, no extra DOM work.
+  private stats: HealthStats = { found: 0, errors: 0, empty: 0 };
   private observer: MutationObserver | null = null;
   private frameQueued = false;
   private pendingTimer: ReturnType<typeof setTimeout> | null = null;
@@ -163,6 +166,10 @@ export class Engine {
 
   total(): number {
     return Object.values(this.counts).reduce((a, b) => a + b, 0);
+  }
+
+  getStats(): HealthStats {
+    return { ...this.stats };
   }
 
   private settledSelector(): string {
@@ -259,6 +266,8 @@ export class Engine {
         else this.pending.delete(el);
       } catch {
         this.pending.delete(el);
+        this.stats.found++;
+        this.stats.errors++;
         failOpen(el);
       }
     };
@@ -353,10 +362,12 @@ export class Engine {
     if (verdict) {
       this.hit(el, verdict, text, config);
       this.fingerprints.set(el, fingerprint(el, text));
+      this.stats.found++;
       return false;
     }
     if (text.trim()) {
       this.pass(el, text);
+      this.stats.found++;
       return false;
     }
     // Feeds render empty shells and hydrate text later: wait, but not forever.
@@ -367,6 +378,8 @@ export class Engine {
     }
     if (now - seen >= timeout) {
       this.pass(el, text);
+      this.stats.found++;
+      this.stats.empty++;
       return false;
     }
     return true;
@@ -427,6 +440,7 @@ export class Engine {
     this.rescanAll = false;
     this.log = [];
     this.counts = {};
+    this.stats = { found: 0, errors: 0, empty: 0 };
     if (this.pendingTimer !== null) clearTimeout(this.pendingTimer);
     this.pendingTimer = null;
   }
