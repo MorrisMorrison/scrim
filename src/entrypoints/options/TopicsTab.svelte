@@ -4,17 +4,15 @@
   import { validateKeyword } from '../../core/matcher';
   import type { Topic } from '../../core/model';
   import { formatSource, parseSource } from '../../core/sources';
-  import { allTopics, deleteCustomTopic, saveCustomTopic, saveOverride, type ScrimState } from '../../core/store';
   import {
-    addEntry,
-    emptyOverride,
-    entryKey,
-    hasEntry,
-    removeEntry,
-    withList,
-    type AnyEntry,
-    type ListField,
-  } from '../../core/topics';
+    addTopicEntry,
+    allTopics,
+    deleteCustomTopic,
+    removeTopicEntry,
+    saveCustomTopic,
+    type ScrimState,
+  } from '../../core/store';
+  import { entryKey, hasEntry, type AnyEntry, type ListField } from '../../core/topics';
   import { localKV } from '../../platform/kv';
   import ListEditor from '../../ui/ListEditor.svelte';
   import type { ListItem } from '../../ui/list-item';
@@ -65,28 +63,14 @@
   async function add(field: ListField, input: string) {
     const value = parseInput(field, input);
     if (value === null) return;
-    const id = topic.id;
-    if (isBuiltinTopicId(id)) {
-      await saveOverride(localKV, id, addEntry(BUILTIN_TOPICS[id], scrim.overrides[id] ?? emptyOverride(), field, value));
-    } else if (!hasEntry(field, topic[field] as AnyEntry[], value)) {
-      await saveCustomTopic(localKV, withList(topic, field, [...(topic[field] as AnyEntry[]), value]));
-    }
+    await addTopicEntry(localKV, scrim, topic.id, field, value);
   }
 
   async function remove(field: ListField, key: string) {
     const items = topic[field] as AnyEntry[];
     const value = items.find((v) => entryKey(field, v) === key);
     if (value === undefined) return;
-    const id = topic.id;
-    if (isBuiltinTopicId(id)) {
-      await saveOverride(
-        localKV,
-        id,
-        removeEntry(BUILTIN_TOPICS[id], scrim.overrides[id] ?? emptyOverride(), field, value),
-      );
-    } else {
-      await saveCustomTopic(localKV, withList(topic, field, items.filter((v) => entryKey(field, v) !== key)));
-    }
+    await removeTopicEntry(localKV, scrim, topic.id, field, value);
   }
 
   async function createTopic(e: SubmitEvent) {

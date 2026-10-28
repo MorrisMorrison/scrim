@@ -3,25 +3,32 @@ import { browser } from 'wxt/browser';
 import { assessHealth } from '../core/health';
 import { blockMessage } from '../core/messages';
 import { buildPipeline, type Pipeline } from '../core/pipeline';
+import type { SourceRef } from '../core/model';
 import { formatSource, sourceKey } from '../core/sources';
 import {
   activeProfile,
   activeTopics,
+  addTopicEntry,
   allTopics,
   filteringActive,
   findTopic,
   loadState,
+  removeTopicEntry,
+  saveAllow,
   type ScrimState,
 } from '../core/store';
+import { hasEntry } from '../core/topics';
 import { localKV, onStoreChanged } from '../platform/kv';
 import type { Diagnostics, LogResponse, Message } from '../platform/messages';
 import { peekEnd, startPeek } from '../platform/peek';
 import { tweaksForSite } from '../sites';
 import type { SiteAdapter } from '../sites/types';
 import { Engine } from './engine';
+import { resolveFeedbackSource } from './feedback';
 import { latestRun } from './latest';
 import { hidePageBlock, showPageBlock } from './overlay';
 import { ACTION_CSS, prehideCss, setStyle, STYLE_IDS } from './styles';
+import { showToast } from './toast';
 import { TweakManager } from './tweaks';
 
 export async function runContent(
@@ -96,7 +103,7 @@ export async function runContent(
       const on = filteringActive(state, location.hostname);
       const profile = activeProfile(state);
       const topics = on ? activeTopics(state) : [];
-      pipeline = buildPipeline(topics);
+      pipeline = buildPipeline(topics, state.allow);
       setStyle(doc, STYLE_IDS.prehide, topics.length ? prehideCss(adapter.itemSelector) : null);
       engine.configure({
         pipeline,
@@ -153,9 +160,69 @@ export async function runContent(
 
   onNavigate((url) => void checkPage(url).catch(failOpen));
 
+  // In-page feedback: remember what was right-clicked; the background sends the menu choice.
+  let menuTarget: Element | null = null;
+  doc.addEventListener(
+    'contextmenu',
+    (e) => {
+      menuTarget = e.target instanceof Element ? e.target : null;
+    },
+    true,
+  );
+
+  const sameSource = (a: SourceRef) => (b: SourceRef) => sourceKey(a) === sourceKey(b);
+
+  async function hideSource(topicId: string, source: SourceRef): Promise<void> {
+    const topic = findTopic(state, topicId);
+    if (!topic) return;
+    const label = formatSource(source);
+    if (hasEntry('sources', topic.sources, source)) {
+      showToast(doc, `${label} is already hidden under ${topic.name}.`);
+      return;
+    }
+    await addTopicEntry(localKV, state, topicId, 'sources', source);
+    const off = activeProfile(state).topics.includes(topicId) ? '' : ` (${topic.name} is off in this profile)`;
+    showToast(doc, `Hiding ${label} under ${topic.name}${off}`, () => {
+      void loadState(localKV)
+        .then((s) => removeTopicEntry(localKV, s, topicId, 'sources', source))
+        .catch(failOpen);
+    });
+  }
+
+  async function allowSource(source: SourceRef): Promise<void> {
+    const label = formatSource(source);
+    if (state.allow.some(sameSource(source))) {
+      showToast(doc, `${label} is already on the Never hide list.`);
+      return;
+    }
+    await saveAllow(localKV, [...state.allow, source]);
+    showToast(doc, `Always showing ${label}`, () => {
+      void loadState(localKV)
+        .then((s) => saveAllow(localKV, s.allow.filter((a) => !sameSource(source)(a))))
+        .catch(failOpen);
+    });
+  }
+
+  async function onMenu(msg: Extract<Message, { type: 'scrim:menu' }>): Promise<void> {
+    const found = resolveFeedbackSource(menuTarget, adapter);
+    if (!found.ok) {
+      showToast(doc, found.message);
+      return;
+    }
+    if (msg.action === 'hide') await hideSource(msg.topicId, found.source);
+    else await allowSource(found.source);
+  }
+
   browser.runtime.onMessage.addListener((msg: Message, _sender, sendResponse) => {
     if (msg.type === 'scrim:reveal') {
       engine.setReveal(msg.on);
+      return;
+    }
+    if (msg.type === 'scrim:menu') {
+      onMenu(msg).catch((e: unknown) => {
+        console.error('[scrim] feedback failed', e);
+        showToast(doc, "Scrim couldn't save that.");
+      });
       return;
     }
     if (msg.type === 'scrim:getLog') {

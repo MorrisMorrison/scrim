@@ -13,7 +13,7 @@ For a miss, find out why it slipped through:
 - **Wording not covered:** add a keyword only if it's unambiguous. Check common collisions ("rust" vs Rust, "war" vs Star Wars, "trump card").
 - **Wrong site extraction:** that's an adapter problem. Use the `add-site-adapter` skill.
 
-For a false positive, find the keyword that fired (the popup log shows `keyword "…"`; Options → Keyword tester reproduces it). Then narrow it: remove it, make it a phrase, or make it a case-sensitive raw regex (`'/\\bWord\\b/'`).
+For a false positive, the user can often fix it in one click: popup log → **Always show [source]** / **Stop hiding "keyword"**, or right-click → Scrim → Always show. Shipped-list changes are still worth it when the keyword misfires for everyone. Find the keyword that fired (the popup log shows `keyword "…"`; Options → Keyword tester reproduces it). Then narrow it: remove it, make it a phrase, or make it a case-sensitive raw regex (`'/\\bWord\\b/'`).
 
 Decide **generic vs personal**:
 - **Generic** entries belong in the shipped defaults.

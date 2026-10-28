@@ -21,11 +21,13 @@
 // - With nothing to filter (no active topics), the observer is disconnected entirely.
 // A settled item whose fingerprint changed is cleared and evaluated afresh.
 import type { HealthStats } from '../core/health';
-import type { Action, ItemFacts, Verdict } from '../core/model';
+import type { Action, ItemFacts, SourceRef, Verdict, VerdictMatch } from '../core/model';
 import type { Pipeline } from '../core/pipeline';
+import { pickSource } from '../core/sources';
 import type { SiteAdapter } from '../sites/types';
 import { applyAction, BAR_ATTR, clearActions, clearItem, failOpen, SCRIM_ATTR } from './actions';
 import { OVERLAY_ID } from './overlay';
+import { TOAST_ID } from './toast';
 
 export const PENDING_TIMEOUT_MS = 800;
 export const LOG_LIMIT = 300;
@@ -37,12 +39,16 @@ export const TOUCHED_LIMIT = 500;
 // While the page keeps changing, look for unsettled items document-wide this often.
 export const SAFETY_SCAN_MS = 2000;
 
-const OWN_NODES = `[${BAR_ATTR}], #${OVERLAY_ID}`;
+const OWN_NODES = `[${BAR_ATTR}], #${OVERLAY_ID}, #${TOAST_ID}`;
 
 export interface LogEntry {
   snippet: string;
   topicId: string;
   reason: string;
+  // What fired and the item's most specific source: the popup offers "stop hiding this
+  // keyword" / "always show this source" from these.
+  match: VerdictMatch;
+  source: SourceRef | null;
 }
 
 export interface EngineConfig {
@@ -360,7 +366,7 @@ export class Engine {
     const { text, sources } = known ?? adapter.extract(el);
     const verdict = config.pipeline.evaluate({ text: adapter.sourcesOnly ? '' : text, sources });
     if (verdict) {
-      this.hit(el, verdict, text, config);
+      this.hit(el, verdict, text, sources, config);
       this.fingerprints.set(el, fingerprint(el, text));
       this.stats.found++;
       return false;
@@ -408,7 +414,7 @@ export class Engine {
     });
   }
 
-  private hit(el: Element, verdict: Verdict, text: string, config: EngineConfig): void {
+  private hit(el: Element, verdict: Verdict, text: string, sources: SourceRef[], config: EngineConfig): void {
     const related = this.opts.adapter.related?.(el) ?? [];
     const topicName = config.topicNames[verdict.topicId] ?? verdict.topicId;
     const bar = applyAction(el, related, config.action, verdict, topicName);
@@ -419,7 +425,13 @@ export class Engine {
         .map((s) => s.trim())
         .find(Boolean)
         ?.slice(0, 120) ?? '(no visible text)';
-    this.log.push({ snippet, topicId: verdict.topicId, reason: verdict.reason });
+    this.log.push({
+      snippet,
+      topicId: verdict.topicId,
+      reason: verdict.reason,
+      match: verdict.match,
+      source: pickSource(sources),
+    });
     if (this.log.length > LOG_LIMIT) this.log.shift();
     this.counts[verdict.topicId] = (this.counts[verdict.topicId] ?? 0) + 1;
     try {

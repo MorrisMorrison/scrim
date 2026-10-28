@@ -40,7 +40,11 @@ storage as long as you load it from the same folder.
 - "Off on this site"
 - how many items were hidden on the page, by topic
 - **Reveal hidden items**, which outlines what was hidden instead of removing it
-- a log of what was hidden and why
+- a log of what was hidden and why, with one-click fixes for false positives: **Always show [source]** and **Stop hiding "keyword"**
+
+**Right-click a post** (on the tuned sites) → **Scrim**:
+- **Hide posts from this source in… → [topic]:** adds the post's most specific source (subreddit, channel, X account, GitHub owner; link domain last) to that topic. A toast confirms it, with **Undo**.
+- **Always show posts from this source:** adds it to the **Never hide** list (works on blurred or collapsed posts, or in reveal mode).
 
 **Options:**
 - **Profiles:** which topics are on, what happens to matches, and site tweaks.
@@ -57,7 +61,7 @@ storage as long as you load it from the same folder.
     - a link domain such as `example.com`
     - On a blocked source's own page (a subreddit, channel, profile or GitHub org), the whole page is covered.
   - **Blocked sites:** domains that redirect to the block page while the topic is active.
-- **Sites:** domains where Scrim does nothing at all.
+- **Sites:** domains where Scrim does nothing at all, and the **Never hide** list: sources whose posts are never hidden, whatever the topics say.
 - **Backup:** export or import everything as JSON, or reset to the defaults.
 - **Keyword tester:** paste a headline to see which topic and keyword would hide it.
 

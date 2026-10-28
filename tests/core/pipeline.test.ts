@@ -32,6 +32,7 @@ describe('buildPipeline', () => {
     expect(p.evaluate({ text: 'running an LLM', sources: [] })).toEqual({
       topicId: 'ai',
       reason: 'keyword "LLM"',
+      match: { kind: 'keyword', keyword: 'LLM', text: 'LLM' },
     });
     expect(p.evaluate({ text: 'daily standup notes', sources: [] })?.topicId).toBe('work');
   });
@@ -41,6 +42,7 @@ describe('buildPipeline', () => {
     expect(p.evaluate({ text: '', sources: [{ kind: 'subreddit', name: 'chatgpt' }] })).toEqual({
       topicId: 'ai',
       reason: 'source r/chatgpt',
+      match: { kind: 'source', source: { kind: 'subreddit', name: 'chatgpt' } },
     });
     expect(p.evaluate({ text: '', sources: [{ kind: 'subreddit', name: 'ChatGPTPro' }] })).toBeNull();
     expect(

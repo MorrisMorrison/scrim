@@ -49,9 +49,16 @@ export interface ItemFacts {
   sources: SourceRef[];
 }
 
+// What made an item match, so feedback can undo exactly that ("stop hiding keyword X",
+// "always show this source").
+export type VerdictMatch =
+  | { kind: 'keyword'; keyword: string; text: string }
+  | { kind: 'source'; source: SourceRef };
+
 export interface Verdict {
   topicId: string;
   reason: string;
+  match: VerdictMatch;
 }
 
 export interface Stage {
