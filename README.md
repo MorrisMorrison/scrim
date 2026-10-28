@@ -35,6 +35,7 @@ storage as long as you load it from the same folder.
 ## Using it
 
 **Popup** (toolbar icon):
+- a health line: how many feed items Scrim is checking, or a ⚠ warning when a site seems to have changed its layout (with **Copy diagnostics** for a bug report)
 - master switch and profile switcher
 - "Off on this site"
 - how many items were hidden on the page, by topic
@@ -103,7 +104,7 @@ Layout:
 
 ## When a site breaks
 
-Sites change their markup.
+Sites change their markup. The popup warns when an adapter finds no items on a feed page, or can’t read many of them.
 1. Save the page's feed container with `copy($0.outerHTML)` in DevTools.
 2. Add it under `tests/fixtures/<site>/`.
 3. Write a failing test in `tests/sites/<site>.test.ts`.

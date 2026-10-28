@@ -18,7 +18,7 @@ All four of `test`, `typecheck`, `lint`, `build` must pass before a change is do
 ## Layout
 | Path | Responsibility |
 |---|---|
-| `src/core/` | **Pure** logic, no DOM, no `browser.*`: model, keyword matcher, pipeline (source → keyword stages), topics + shipped defaults (`defaults/`), store over a `KV` interface, DNR rule generation, validation |
+| `src/core/` | **Pure** logic, no DOM, no `browser.*`: model, keyword matcher, pipeline (source → keyword stages), topics + shipped defaults (`defaults/`), store over a `KV` interface, DNR rule generation, validation, site health assessment (`health.ts`) |
 | `src/core/defaults/` | One file per built-in topic (keywords + default subreddit sources); `index.ts` registers topics and default profiles |
 | `src/sites/` | One `SiteAdapter` per tuned site (+ its `Tweak`s); `index.ts` is the registry and the content-script match patterns |
 | `src/content/` | DOM engine (incremental scanning, fingerprints, fail-open), actions (hide/blur/collapse), tweak manager, page-block overlay, controller (glue) |

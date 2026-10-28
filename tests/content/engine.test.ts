@@ -556,4 +556,42 @@ describe('Engine', () => {
       }
     });
   });
+
+  describe('health counters', () => {
+    it('counts the items it settled, without nested duplicates', () => {
+      const e = setup(
+        '<div class="item">an LLM post</div><div class="item">cats</div>' +
+          '<div class="item">LLM <div class="item">nested</div></div>',
+      );
+      e.configure(config());
+      expect(e.getStats()).toEqual({ found: 3, errors: 0, empty: 0 });
+    });
+
+    it('counts items that failed open on extraction errors', () => {
+      const broken: SiteAdapter = {
+        ...adapter,
+        extract: () => {
+          throw new Error('boom');
+        },
+      };
+      setup('<div class="item">a</div><div class="item">b</div>', { adapter: broken }).configure(config());
+      expect(engine?.getStats()).toEqual({ found: 2, errors: 2, empty: 0 });
+    });
+
+    it('counts items shown only because they never got text', () => {
+      vi.useFakeTimers();
+      const e = setup('<div class="item"></div><div class="item">cats</div>');
+      e.configure(config());
+      expect(e.getStats()).toEqual({ found: 1, errors: 0, empty: 0 });
+      vi.advanceTimersByTime(800);
+      expect(e.getStats()).toEqual({ found: 2, errors: 0, empty: 1 });
+    });
+
+    it('resets with the configuration', () => {
+      const e = setup('<div class="item">cats</div>');
+      e.configure(config());
+      e.configure(null);
+      expect(e.getStats()).toEqual({ found: 0, errors: 0, empty: 0 });
+    });
+  });
 });

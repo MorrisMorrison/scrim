@@ -33,4 +33,5 @@ export const x: SiteAdapter = {
     const handle = handleFromPath(url.pathname, false);
     return handle ? { kind: 'x-user', handle } : null;
   },
+  expectsItems: (url) => /^\/(home|search)\b/.test(url.pathname),
 };

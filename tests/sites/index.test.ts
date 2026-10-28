@@ -31,3 +31,45 @@ describe('site registry', () => {
     expect(tweaksForSite('youtube')).toHaveLength(6);
   });
 });
+
+describe('expectsItems (health check)', () => {
+  const expects = (host: string, path: string) => {
+    const adapter = adapterForHost(host);
+    return adapter?.expectsItems?.(new URL(`https://${host}${path}`)) ?? false;
+  };
+
+  it('is true on feed pages', () => {
+    for (const [host, path] of [
+      ['www.reddit.com', '/'],
+      ['www.reddit.com', '/r/gardening/'],
+      ['www.reddit.com', '/best/'],
+      ['www.youtube.com', '/'],
+      ['www.youtube.com', '/results?search_query=bread'],
+      ['www.youtube.com', '/watch?v=abc'],
+      ['www.youtube.com', '/feed/subscriptions'],
+      ['x.com', '/home'],
+      ['x.com', '/search?q=cats'],
+      ['news.ycombinator.com', '/'],
+      ['news.ycombinator.com', '/newest'],
+      ['www.google.com', '/search?q=bread'],
+      ['news.google.com', '/home'],
+    ]) {
+      expect(expects(host as string, path as string), `${host}${path}`).toBe(true);
+    }
+  });
+
+  it('is false where a page can legitimately have no items', () => {
+    for (const [host, path] of [
+      ['www.reddit.com', '/settings'],
+      ['www.youtube.com', '/account'],
+      ['x.com', '/settings/account'],
+      ['news.ycombinator.com', '/item?id=1'],
+      ['www.google.com', '/'],
+      ['www.google.com', '/search?q=bread&udm=2'],
+      ['www.google.com', '/search?q=bread&tbm=isch'],
+      ['github.com', '/torvalds/linux'],
+    ]) {
+      expect(expects(host as string, path as string), `${host}${path}`).toBe(false);
+    }
+  });
+});

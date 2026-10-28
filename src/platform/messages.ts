@@ -1,4 +1,5 @@
 import type { LogEntry } from '../content/engine';
+import type { Health, HealthStats } from '../core/health';
 
 export type Message =
   | { type: 'scrim:count'; count: number } // content → background (badge)
@@ -12,4 +13,15 @@ export interface LogResponse {
   counts: Record<string, number>;
   total: number;
   revealed: boolean;
+  health: Health;
+  // Copied by the popup's "Copy diagnostics" button. Path only: no query string, no page content.
+  diagnostics: Diagnostics;
+}
+
+export interface Diagnostics extends HealthStats {
+  scrim: string; // extension version
+  site: string; // adapter id
+  path: string;
+  itemSelector: string;
+  status: Health['status'];
 }

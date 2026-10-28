@@ -9,6 +9,9 @@ export const googleSearch: SiteAdapter = {
   appliesTo: (host) => normalizeHost(host) === 'google.com',
   itemSelector: 'div.g, div[data-hveid] > div.tF2Cxc',
   extract: (el) => ({ text: richText(el), sources: linkDomains(el) }),
+  // Web results only: the images/videos/shopping tabs (tbm=…, udm=…) use other layouts.
+  expectsItems: (url) =>
+    url.pathname === '/search' && !url.searchParams.has('tbm') && !url.searchParams.has('udm'),
 };
 
 export const googleNews: SiteAdapter = {
@@ -17,6 +20,7 @@ export const googleNews: SiteAdapter = {
   hosts: ['news.google.com'],
   itemSelector: 'article',
   extract: (el) => ({ text: richText(el), sources: linkDomains(el) }),
+  expectsItems: (url) => /^\/($|home|foryou|topics|stories|search)/.test(url.pathname),
 };
 
 const KNOWN_AIO = 'div[data-subtree="aio"], div[data-al-attr="aio"], #m-x-content';

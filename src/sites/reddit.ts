@@ -27,4 +27,6 @@ export const reddit: SiteAdapter = {
     const m = /^\/r\/([A-Za-z0-9_]+)/.exec(url.pathname);
     return m ? { kind: 'subreddit', name: m[1] ?? '' } : null;
   },
+  // Home, the sort tabs and any subreddit (listings and post pages).
+  expectsItems: (url) => /^\/($|(best|hot|new|top|rising)\b|r\/)/.test(url.pathname),
 };
