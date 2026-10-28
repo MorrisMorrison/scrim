@@ -8,9 +8,25 @@ import {
   isBuiltinTopicId,
 } from './defaults';
 import { hostMatches } from './host';
-import type { BuiltinTopicId, BuiltinTopicOverride, GlobalSettings, Profile, Topic } from './model';
-import { applyOverride } from './topics';
-import { isOverride, isProfile, isSettings, isTopic } from './validate';
+import type {
+  BuiltinTopicId,
+  BuiltinTopicOverride,
+  GlobalSettings,
+  Profile,
+  SourceRef,
+  Topic,
+} from './model';
+import {
+  addEntry,
+  applyOverride,
+  emptyOverride,
+  hasEntry,
+  removeEntry,
+  withList,
+  type AnyEntry,
+  type ListField,
+} from './topics';
+import { isOverride, isProfile, isSettings, isSourceRef, isTopic } from './validate';
 
 export interface KV {
   getAll(): Promise<Record<string, unknown>>;
@@ -23,6 +39,8 @@ export const SCHEMA_VERSION = 1;
 export const KEYS = {
   settings: 'settings',
   schemaVersion: 'schemaVersion',
+  // The "Never hide" allowlist: sources whose items are never hidden, whatever the topics say.
+  allow: 'allow',
   profile: (id: string) => `profile:${id}`,
   topic: (id: string) => `topic:${id}`,
   override: (id: BuiltinTopicId) => `topic-override:${id}`,
@@ -36,6 +54,7 @@ function isScrimKey(key: string): boolean {
   return (
     key === KEYS.settings ||
     key === KEYS.schemaVersion ||
+    key === KEYS.allow ||
     key.startsWith(PROFILE_PREFIX) ||
     key.startsWith(TOPIC_PREFIX) ||
     key.startsWith(OVERRIDE_PREFIX)
@@ -47,7 +66,10 @@ export interface ScrimState {
   profiles: Profile[];
   customTopics: Topic[];
   overrides: Partial<Record<BuiltinTopicId, BuiltinTopicOverride>>;
+  allow: SourceRef[];
 }
+
+const isSourceList = (v: unknown): v is SourceRef[] => Array.isArray(v) && v.every(isSourceRef);
 
 function defaultProfiles(): Profile[] {
   return DEFAULT_PROFILES.map((p) => structuredClone(p));
@@ -84,6 +106,7 @@ export function parseState(raw: Record<string, unknown>): ScrimState {
     profiles: sortProfiles(profiles.length ? profiles : defaultProfiles()),
     customTopics: customTopics.sort((a, b) => a.name.localeCompare(b.name)),
     overrides,
+    allow: isSourceList(raw[KEYS.allow]) ? (raw[KEYS.allow] as SourceRef[]) : [],
   };
 }
 
@@ -214,6 +237,9 @@ export function parseExport(data: unknown): ScrimState | string {
     if (!isBuiltinTopicId(id) || !isOverride(ov)) return `Invalid override for topic "${id}"`;
     overrides[id] = ov;
   }
+  // Backups made before the allowlist existed have no `allow`: that just means an empty list.
+  if (d.allow !== undefined && !isSourceList(d.allow)) return 'Invalid never-hide list';
+  const allow = d.allow === undefined ? [] : d.allow;
   const activeProfileId = profiles.some((p) => p.id === settings.activeProfileId)
     ? settings.activeProfileId
     : profiles[0]!.id;
@@ -222,6 +248,7 @@ export function parseExport(data: unknown): ScrimState | string {
     profiles: sortProfiles(profiles),
     customTopics: [...customTopics].sort((a, b) => a.name.localeCompare(b.name)),
     overrides,
+    allow,
   };
 }
 
@@ -242,10 +269,59 @@ export async function replaceState(kv: KV, state: ScrimState): Promise<void> {
     const ov = state.overrides[id];
     if (ov) items[KEYS.override(id)] = ov;
   }
+  if (state.allow.length) items[KEYS.allow] = state.allow;
   await kv.set(items);
 }
 
 export async function resetAll(kv: KV): Promise<void> {
   await clearAll(kv);
   await kv.set(seedItems());
+}
+
+export async function saveAllow(kv: KV, allow: SourceRef[]): Promise<void> {
+  await kv.set({ [KEYS.allow]: allow });
+}
+
+// Add or remove one keyword / source / blocked site on any topic: built-in topics record the
+// change in their override (so shipped list updates still apply), custom topics are edited
+// directly. Used by the options page and by in-page feedback.
+export async function addTopicEntry(
+  kv: KV,
+  state: ScrimState,
+  topicId: string,
+  field: ListField,
+  value: AnyEntry,
+): Promise<void> {
+  if (isBuiltinTopicId(topicId)) {
+    const ov = state.overrides[topicId] ?? emptyOverride();
+    await saveOverride(kv, topicId, addEntry(BUILTIN_TOPICS[topicId], ov, field, value));
+    return;
+  }
+  const topic = customTopic(state, topicId);
+  const items = topic[field] as AnyEntry[];
+  if (!hasEntry(field, items, value)) await saveCustomTopic(kv, withList(topic, field, [...items, value]));
+}
+
+export async function removeTopicEntry(
+  kv: KV,
+  state: ScrimState,
+  topicId: string,
+  field: ListField,
+  value: AnyEntry,
+): Promise<void> {
+  if (isBuiltinTopicId(topicId)) {
+    const ov = state.overrides[topicId] ?? emptyOverride();
+    await saveOverride(kv, topicId, removeEntry(BUILTIN_TOPICS[topicId], ov, field, value));
+    return;
+  }
+  const topic = customTopic(state, topicId);
+  const items = topic[field] as AnyEntry[];
+  const kept = items.filter((v) => !hasEntry(field, [value], v));
+  if (kept.length !== items.length) await saveCustomTopic(kv, withList(topic, field, kept));
+}
+
+function customTopic(state: ScrimState, topicId: string): Topic {
+  const topic = state.customTopics.find((t) => t.id === topicId);
+  if (!topic) throw new Error(`Unknown topic: ${topicId}`);
+  return topic;
 }

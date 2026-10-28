@@ -2,7 +2,17 @@
   import { onDestroy, onMount } from 'svelte';
   import { browser } from 'wxt/browser';
   import { hostMatches, normalizeHost } from '../../core/host';
-  import { activeProfile, allTopics, isHostDisabled, saveSettings } from '../../core/store';
+  import type { SourceRef } from '../../core/model';
+  import { formatSource, sourceKey } from '../../core/sources';
+  import {
+    activeProfile,
+    allTopics,
+    isHostDisabled,
+    removeTopicEntry,
+    saveAllow,
+    saveSettings,
+  } from '../../core/store';
+  import type { LogEntry } from '../../content/engine';
   import { localKV, onStoreChanged } from '../../platform/kv';
   import type { LogResponse, Message } from '../../platform/messages';
   import ProfileSwitcher from '../../ui/ProfileSwitcher.svelte';
@@ -16,6 +26,19 @@
   let info = $state<LogResponse | null>(null);
   let showLog = $state(false);
   let copied = $state(false);
+
+  // False-positive feedback from the log: never hide this source again, or drop the keyword.
+  async function alwaysShow(source: SourceRef) {
+    const s = store.state;
+    if (!s || s.allow.some((a) => sourceKey(a) === sourceKey(source))) return;
+    await saveAllow(localKV, [...s.allow, source]);
+  }
+
+  async function stopKeyword(topicId: string, keyword: string) {
+    if (store.state) await removeTopicEntry(localKV, store.state, topicId, 'keywords', keyword);
+  }
+
+  const keywordOf = (entry: LogEntry) => (entry.match.kind === 'keyword' ? entry.match.keyword : null);
 
   async function copyDiagnostics() {
     if (!info) return;
@@ -136,6 +159,16 @@
                 <li>
                   <span>{entry.snippet}</span>
                   <small class="muted">{topicNames[entry.topicId] ?? entry.topicId} · {entry.reason}</small>
+                  <span class="actions">
+                    {#if entry.source}
+                      {@const source = entry.source}
+                      <button class="link" onclick={() => alwaysShow(source)}>Always show {formatSource(source)}</button>
+                    {/if}
+                    {#if keywordOf(entry)}
+                      {@const keyword = keywordOf(entry) ?? ''}
+                      <button class="link" onclick={() => stopKeyword(entry.topicId, keyword)}>Stop hiding "{keyword}"</button>
+                    {/if}
+                  </span>
                 </li>
               {/each}
             </ol>
@@ -169,6 +202,7 @@
   section { display: flex; flex-direction: column; gap: 6px; }
   .counts { margin: 0; padding-left: 18px; }
   .log { margin: 0; padding-left: 18px; max-height: 220px; overflow: auto; }
-  .log li { display: flex; flex-direction: column; margin-bottom: 4px; }
+  .log li { display: flex; flex-direction: column; margin-bottom: 6px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 12px; }
   footer { border-top: 1px solid var(--border); padding-top: 8px; display: flex; justify-content: space-between; }
 </style>

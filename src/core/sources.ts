@@ -66,3 +66,15 @@ export function parseSource(input: string): SourceRef | null {
   }
   return null;
 }
+
+// Most specific first: a community/account says more about an item than a link it contains.
+const SPECIFICITY: SourceRef['kind'][] = ['subreddit', 'channel', 'x-user', 'github-owner', 'domain'];
+
+// The source in-page feedback acts on ("hide posts from this source").
+export function pickSource(sources: readonly SourceRef[]): SourceRef | null {
+  for (const kind of SPECIFICITY) {
+    const found = sources.find((s) => s.kind === kind);
+    if (found) return found;
+  }
+  return null;
+}

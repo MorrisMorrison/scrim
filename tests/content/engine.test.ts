@@ -65,7 +65,15 @@ describe('Engine', () => {
     expect(state('b')).toBe('pass');
     expect(e.total()).toBe(1);
     expect(e.getCounts()).toEqual({ ai: 1 });
-    expect(e.getLog()).toEqual([{ snippet: 'an LLM post', topicId: 'ai', reason: 'keyword "LLM"' }]);
+    expect(e.getLog()).toEqual([
+      {
+        snippet: 'an LLM post',
+        topicId: 'ai',
+        reason: 'keyword "LLM"',
+        match: { kind: 'keyword', keyword: 'LLM', text: 'LLM' },
+        source: null,
+      },
+    ]);
   });
 
   it('hides source hits', () => {
@@ -73,6 +81,12 @@ describe('Engine', () => {
     e.configure(config());
     expect(state('a')).toBe('hit:ai');
     expect(e.getLog()[0]?.reason).toBe('source r/chatgpt');
+  });
+
+  it("logs the hit item's most specific source, for 'always show' feedback", () => {
+    const e = setup('<div class="item" id="a" data-src="gardening">an LLM post</div>');
+    e.configure(config());
+    expect(e.getLog()[0]?.source).toEqual({ kind: 'subreddit', name: 'gardening' });
   });
 
   it('does nothing with an empty pipeline', () => {

@@ -6,7 +6,10 @@ export type Message =
   | { type: 'scrim:getLog' } // popup → content
   | { type: 'scrim:reveal'; on: boolean } // popup → content
   | { type: 'scrim:peek'; domain: string } // block page → background
-  | { type: 'scrim:sync' }; // block page → background, resolves after rules update
+  | { type: 'scrim:sync' } // block page → background, resolves after rules update
+  // background (context menu) → content: act on the right-clicked post
+  | { type: 'scrim:menu'; action: 'hide'; topicId: string }
+  | { type: 'scrim:menu'; action: 'allow' };
 
 export interface LogResponse {
   log: LogEntry[];
